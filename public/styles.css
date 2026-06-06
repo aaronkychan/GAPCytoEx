@@ -1,0 +1,124 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-muted: #eef3f8;
+  --border: #cbd5e1;
+  --ink: #162033;
+  --muted: #617083;
+  --accent: #0f766e;
+  --warn: #b45309;
+  --radius: 4px;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(100% - 32px, 1280px);
+  margin: 0 auto;
+  padding: 24px 0;
+}
+
+.app-header,
+.workbench {
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 20px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 24px;
+}
+
+h2 {
+  font-size: 15px;
+}
+
+p {
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.toolbar {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  border: 1px solid var(--border);
+}
+
+.toolbar button {
+  min-width: 56px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: 6px 10px;
+}
+
+.toolbar button:last-child {
+  border-right: 0;
+}
+
+.toolbar button[aria-pressed="true"] {
+  background: var(--accent);
+  color: white;
+}
+
+.workbench {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 320px;
+  min-height: 560px;
+  margin-top: 16px;
+}
+
+.panel,
+.canvas-panel {
+  padding: 16px;
+}
+
+.panel {
+  background: var(--surface-muted);
+}
+
+.canvas-panel {
+  border-inline: 1px solid var(--border);
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  margin-top: 14px;
+}
+
+input {
+  width: 7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+}

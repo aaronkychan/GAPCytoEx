@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="940" viewBox="0 0 1440 940" role="img" aria-labelledby="title desc">
+  <title id="title">Revised control organization for QPA to Cytoscape translator</title>
+  <desc id="desc">A desktop mockup preserving the QPA to Cytoscape translator identity, with editing controls open, infrequent controls folded, and one unified output area for computed or exported results.</desc>
+  <defs>
+    <linearGradient id="canvasBg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#e7f0f7"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#23344f" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .bg { fill: #eef3f7; }
+      .panel { fill: #ffffff; stroke: #cfd8e3; stroke-width: 1.4; filter: url(#shadow); }
+      .panel-flat { fill: #ffffff; stroke: #cfd8e3; stroke-width: 1.4; }
+      .muted-panel { fill: #f8fafc; stroke: #d7e0ea; stroke-width: 1.2; }
+      .header { fill: #182334; }
+      .title { font: 700 26px "Segoe UI", Arial, sans-serif; fill: #f8fafc; }
+      .subtitle { font: 14px "Segoe UI", Arial, sans-serif; fill: #b8c5d6; }
+      .section-title { font: 800 15px "Segoe UI", Arial, sans-serif; fill: #1d2a3a; }
+      .label { font: 13px "Segoe UI", Arial, sans-serif; fill: #344256; }
+      .small { font: 12px "Segoe UI", Arial, sans-serif; fill: #637184; }
+      .tiny { font: 11px "Segoe UI", Arial, sans-serif; fill: #7a8798; }
+      .button { fill: #eef4fb; stroke: #c9d6e4; stroke-width: 1; }
+      .button-primary { fill: #2563eb; stroke: #1e40af; stroke-width: 1; }
+      .button-green { fill: #0f766e; stroke: #0b5f59; stroke-width: 1; }
+      .button-warn { fill: #fff7ed; stroke: #fed7aa; stroke-width: 1; }
+      .button-text { font: 700 12px "Segoe UI", Arial, sans-serif; fill: #1d2a3a; }
+      .button-text-light { font: 800 12px "Segoe UI", Arial, sans-serif; fill: #ffffff; }
+      .badge { fill: #eff6ff; stroke: #bfdbfe; stroke-width: 1; }
+      .badge-text { font: 700 11px "Segoe UI", Arial, sans-serif; fill: #1d4ed8; }
+      .accordion { fill: #f3f6fa; stroke: #d8e1ec; stroke-width: 1; }
+      .accordion-text { font: 750 13px "Segoe UI", Arial, sans-serif; fill: #2d3b4f; }
+      .collapsed-text { font: 12px "Segoe UI", Arial, sans-serif; fill: #718096; }
+      .info-head { font: 800 14px "Segoe UI", Arial, sans-serif; fill: #1d2a3a; }
+      .mono { font: 12px "Cascadia Mono", Consolas, monospace; fill: #334155; }
+      .node { fill: #ffffff; stroke: #2563eb; stroke-width: 3; }
+      .edge { stroke: #334155; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .edge-hot { stroke: #0f766e; stroke-width: 4; fill: none; marker-end: url(#arrowHot); }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowHot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f766e"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1440" height="940"/>
+
+  <rect class="header" x="30" y="24" width="1380" height="82" rx="12"/>
+  <text class="title" x="58" y="62">QPA ↔ Cytoscape Quiver Translator</text>
+  <text class="subtitle" x="58" y="87">Translator first; optional computations live in the unified Output area</text>
+  <rect class="button" x="1206" y="47" width="88" height="34" rx="7"/>
+  <text class="button-text" x="1229" y="69">Theme</text>
+  <rect class="button-primary" x="1308" y="47" width="72" height="34" rx="7"/>
+  <text class="button-text-light" x="1330" y="69">Run</text>
+
+  <rect class="panel-flat" x="30" y="122" width="1380" height="52" rx="10"/>
+  <text class="section-title" x="56" y="154">QPA text input / import</text>
+  <text class="small" x="238" y="154">Foldable, but still part of the translator workflow</text>
+  <text class="accordion-text" x="1365" y="154">⌄</text>
+
+  <rect class="panel" x="30" y="194" width="1380" height="708" rx="14"/>
+  <text class="section-title" x="56" y="226">Translator workbench</text>
+
+  <rect class="muted-panel" x="56" y="246" width="848" height="226" rx="10"/>
+  <text class="section-title" x="78" y="274">Controls</text>
+  <text class="small" x="148" y="274">Editing stays visible; rare tools are folded accordions</text>
+
+  <rect class="panel-flat" x="78" y="294" width="254" height="156" rx="9"/>
+  <text class="section-title" x="98" y="322">Edit object</text>
+  <text class="small" x="184" y="322">always open</text>
+  <rect class="button-primary" x="98" y="342" width="94" height="30" rx="7"/>
+  <text class="button-text-light" x="120" y="362">Add vertex</text>
+  <rect class="button-primary" x="202" y="342" width="94" height="30" rx="7"/>
+  <text class="button-text-light" x="225" y="362">Add arrow</text>
+  <rect class="button" x="98" y="382" width="94" height="30" rx="7"/>
+  <text class="button-text" x="127" y="402">Rename</text>
+  <rect class="button-warn" x="202" y="382" width="94" height="30" rx="7"/>
+  <text class="button-text" x="231" y="402">Delete</text>
+  <text class="tiny" x="98" y="434">Current mode + selected object status.</text>
+
+  <rect class="panel-flat" x="350" y="294" width="254" height="156" rx="9"/>
+  <text class="section-title" x="370" y="322">Relations</text>
+  <rect class="button-green" x="370" y="342" width="116" height="30" rx="7"/>
+  <text class="button-text-light" x="393" y="362">New relation</text>
+  <rect class="button" x="496" y="342" width="74" height="30" rx="7"/>
+  <text class="button-text" x="518" y="362">Undo</text>
+  <rect class="button" x="370" y="382" width="88" height="30" rx="7"/>
+  <text class="button-text" x="394" y="402">Edit</text>
+  <rect class="button-warn" x="468" y="382" width="88" height="30" rx="7"/>
+  <text class="button-text" x="492" y="402">Remove</text>
+  <text class="tiny" x="370" y="434">Path selection restricts the next arrow.</text>
+
+  <rect class="panel-flat" x="622" y="294" width="254" height="156" rx="9"/>
+  <text class="section-title" x="642" y="322">Translator actions</text>
+  <rect class="button-primary" x="642" y="342" width="174" height="32" rx="8"/>
+  <text class="button-text-light" x="665" y="363">QPA → Cytoscape</text>
+  <rect class="button-primary" x="642" y="384" width="174" height="32" rx="8"/>
+  <text class="button-text-light" x="665" y="405">Cytoscape → QPA</text>
+  <rect class="badge" x="642" y="426" width="98" height="22" rx="11"/>
+  <text class="badge-text" x="660" y="442">Graph valid</text>
+
+  <rect class="accordion" x="78" y="460" width="196" height="34" rx="7"/>
+  <text class="accordion-text" x="96" y="482">› Canvas zoom / fit</text>
+  <text class="collapsed-text" x="228" y="482">folded</text>
+  <rect class="accordion" x="286" y="460" width="184" height="34" rx="7"/>
+  <text class="accordion-text" x="304" y="482">› File save / export</text>
+  <rect class="accordion" x="482" y="460" width="164" height="34" rx="7"/>
+  <text class="accordion-text" x="500" y="482">› Bend arrows</text>
+  <rect class="accordion" x="658" y="460" width="190" height="34" rx="7"/>
+  <text class="accordion-text" x="676" y="482">› Display options</text>
+
+  <rect class="muted-panel" x="928" y="246" width="456" height="226" rx="10"/>
+  <text class="info-head" x="950" y="274">Output</text>
+  <text class="small" x="1008" y="274">one corner for translator output, compute controls, and computed results</text>
+  <rect class="button-primary" x="950" y="296" width="118" height="28" rx="7"/>
+  <text class="button-text-light" x="974" y="315">Translate</text>
+  <rect class="button" x="1078" y="296" width="84" height="28" rx="7"/>
+  <text class="button-text" x="1103" y="315">Copy</text>
+  <rect class="button" x="1172" y="296" width="84" height="28" rx="7"/>
+  <text class="button-text" x="1194" y="315">Clear</text>
+  <rect class="button" x="1266" y="296" width="92" height="28" rx="7"/>
+  <text class="button-text" x="1288" y="315">Export</text>
+
+  <text class="small" x="950" y="354">Optional computations</text>
+  <text class="small" x="950" y="384">n</text>
+  <rect class="button" x="972" y="365" width="40" height="28" rx="6"/>
+  <text class="button-text" x="987" y="384">3</text>
+  <rect class="button" x="1024" y="365" width="150" height="28" rx="6"/>
+  <text class="button-text" x="1047" y="384">n-ambiguities</text>
+  <rect class="button" x="1186" y="365" width="92" height="28" rx="6"/>
+  <text class="button-text" x="1207" y="384">Bardzell</text>
+  <rect class="button" x="1288" y="365" width="70" height="28" rx="6"/>
+  <text class="button-text" x="1308" y="384">HH</text>
+
+  <rect class="panel-flat" x="950" y="414" width="408" height="38" rx="7"/>
+  <text class="mono" x="966" y="438">Last output: Γ[2] contains a*b | c*d | a</text>
+
+  <rect class="muted-panel" x="56" y="520" width="260" height="332" rx="10"/>
+  <text class="section-title" x="78" y="550">Relations</text>
+  <text class="small" x="78" y="574">Data panel beside the canvas</text>
+  <rect class="panel-flat" x="78" y="610" width="210" height="42" rx="7"/>
+  <text class="mono" x="96" y="636">r1: a*b*c</text>
+  <rect class="panel-flat" x="78" y="664" width="210" height="42" rx="7"/>
+  <text class="mono" x="96" y="690">r2: c*d*a</text>
+  <text class="tiny" x="78" y="770">Only relation display/selection here.</text>
+
+  <rect x="338" y="520" width="610" height="332" rx="10" fill="url(#canvasBg)" stroke="#cad7e3" stroke-width="1.4"/>
+  <text class="section-title" x="362" y="550">Cytoscape canvas</text>
+  <path class="edge-hot" d="M 489 668 C 548 584, 670 584, 728 668"/>
+  <path class="edge" d="M 728 668 C 788 750, 615 798, 552 724"/>
+  <path class="edge" d="M 552 724 C 489 792, 422 738, 489 668"/>
+  <circle class="node" cx="489" cy="668" r="27"/>
+  <circle class="node" cx="728" cy="668" r="27"/>
+  <circle class="node" cx="552" cy="724" r="27"/>
+  <text class="button-text" x="483" y="673">v1</text>
+  <text class="button-text" x="722" y="673">v2</text>
+  <text class="button-text" x="546" y="729">v3</text>
+  <text class="mono" x="584" y="615">selected paths animate here</text>
+
+  <rect class="muted-panel" x="970" y="520" width="414" height="332" rx="10"/>
+  <text class="section-title" x="990" y="550">Output details</text>
+  <text class="small" x="990" y="580">Same Output area, expanded vertically for larger results</text>
+  <rect class="button-primary" x="990" y="604" width="88" height="28" rx="7"/>
+  <text class="button-text-light" x="1009" y="623">QPA</text>
+  <rect class="button" x="1086" y="604" width="104" height="28" rx="7"/>
+  <text class="button-text" x="1105" y="623">Ambiguities</text>
+  <rect class="button" x="1198" y="604" width="88" height="28" rx="7"/>
+  <text class="button-text" x="1218" y="623">Bardzell</text>
+  <rect class="button" x="1294" y="604" width="56" height="28" rx="7"/>
+  <text class="button-text" x="1311" y="623">HH</text>
+  <text class="mono" x="990" y="670">Quiver([...], [[...]]);</text>
+  <rect class="panel-flat" x="990" y="696" width="354" height="42" rx="7"/>
+  <text class="mono" x="1008" y="722">Γ[2]  a*b | c*d | a</text>
+  <rect class="panel-flat" x="990" y="750" width="354" height="42" rx="7"/>
+  <text class="mono" x="1008" y="776">Γ[2]  c*d | a*b | c</text>
+  <text class="tiny" x="990" y="824">Output rows can still update canvas selection.</text>
+</svg>

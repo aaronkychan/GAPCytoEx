@@ -1,0 +1,541 @@
+:root {
+    color-scheme: light;
+    --bg: #f5f7fb;
+    --surface: #ffffff;
+    --surface-muted: #f8fafc;
+    --surface-strong: #eef3f8;
+    --input-bg: #ffffff;
+    --viewer-bg: #ffffff;
+    --code-bg: #eef3f8;
+    --relation-add-bg: #eff6ff;
+    --text: #162033;
+    --muted: #617083;
+    --border: #d8e0ea;
+    --border-strong: #b9c6d4;
+    --accent: #2563eb;
+    --accent-strong: #1d4ed8;
+    --accent-soft: #dbeafe;
+    --accent-soft-text: #1d4ed8;
+    --warning: #b45309;
+    --danger: #b91c1c;
+    --button-primary-text: #ffffff;
+    --focus-ring: rgba(37, 99, 235, 0.18);
+    --relation-color-primary: #ff6f00;
+    --relation-color-secondary: #0080ff;
+    --shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
+    --radius: 8px;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
+        monospace;
+    --ui: Inter, "Segoe UI", system-ui, -apple-system,
+        BlinkMacSystemFont, sans-serif;
+}
+
+body[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f172a;
+    --surface: #172033;
+    --surface-muted: #111827;
+    --surface-strong: #22304a;
+    --button-bg: #263653;
+    --button-hover-bg: #30466d;
+    --input-bg: #0b1120;
+    --viewer-bg: #0b1120;
+    --code-bg: #22304a;
+    --relation-add-bg: #172554;
+    --text: #e5edf7;
+    --muted: #a8b3c5;
+    --border: #334155;
+    --border-strong: #526176;
+    --accent: #60a5fa;
+    --accent-strong: #93c5fd;
+    --accent-soft: #1e3a5f;
+    --accent-soft-text: #bfdbfe;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --button-primary-text: #08111f;
+    --focus-ring: rgba(96, 165, 250, 0.24);
+    --relation-color-primary: #fbbf24;
+    --relation-color-secondary: #86efac;
+    --shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ui);
+    font-size: 15px;
+    line-height: 1.45;
+}
+
+button,
+input,
+textarea,
+summary {
+    font: inherit;
+}
+
+button,
+input[type="button"] {
+    min-height: 34px;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--button-bg, var(--surface));
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 650;
+    padding: 0.45rem 0.72rem;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.15s ease;
+}
+
+button:hover:not(:disabled),
+input[type="button"]:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--button-hover-bg, var(--button-bg, var(--surface)));
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.14);
+    transform: translateY(-1px);
+}
+
+button:disabled,
+input[type="button"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.48;
+}
+
+input[type="text"],
+input[type="file"],
+textarea {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text);
+}
+
+input[type="text"] {
+    min-height: 32px;
+    padding: 0.32rem 0.45rem;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: var(--accent);
+}
+
+textarea {
+    width: 100%;
+    min-height: 8.5rem;
+    margin-top: 0.35rem;
+    padding: 0.65rem 0.75rem;
+    resize: vertical;
+    font-family: var(--mono);
+    font-size: 0.92rem;
+    line-height: 1.45;
+}
+
+a {
+    color: var(--accent-strong);
+}
+
+.app-shell {
+    width: min(100% - 32px, 1280px);
+    margin: 0 auto;
+    padding: 26px 0 30px;
+}
+
+.app-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 18px;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.theme-toggle {
+    min-width: 7.5rem;
+    white-space: nowrap;
+}
+
+.app-title {
+    margin: 0;
+    font-size: clamp(1.6rem, 3vw, 2.35rem);
+    line-height: 1.05;
+    letter-spacing: 0;
+}
+
+.app-subtitle {
+    max-width: 62ch;
+    margin: 0.45rem 0 0;
+    color: var(--muted);
+}
+
+.status-text {
+    color: var(--danger);
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.codetext {
+    font-family: var(--mono);
+}
+
+.relationRow {
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    padding: 0.28rem 0.45rem;
+}
+
+.relationRow:hover {
+    background: var(--surface-strong);
+}
+
+.selectedRelationRow {
+    border-left-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-soft-text) !important;
+    font-weight: 700;
+}
+
+#midCol {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 14px 0;
+}
+
+.action-help {
+    flex: 1;
+    color: var(--muted);
+    font-size: 0.92rem;
+}
+
+.button-primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--button-primary-text);
+    font-size: 1rem;
+}
+
+.button-primary:hover:not(:disabled) {
+    border-color: var(--accent-strong);
+    background: var(--accent-strong);
+}
+
+.accordionGroup {
+    width: 100%;
+    overflow: hidden;
+}
+
+.accordionTrigger {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.accordionLabel {
+    display: flex;
+    cursor: pointer;
+    padding: 0.85rem 1rem;
+    font-weight: 800;
+    background-color: var(--surface-strong);
+    user-select: none;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+}
+
+.accordionLabel::after {
+    content: "\276F";
+    width: 1em;
+    height: 1em;
+    text-align: center;
+    transform: rotate(90deg);
+    transition: transform 0.2s ease;
+}
+
+.accordionPanel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+}
+
+.accordionTrigger:checked + .accordionLabel + .accordionPanel {
+    max-height: 38rem;
+}
+
+.accordionTrigger:checked + .accordionLabel::after {
+    transform: rotate(270deg);
+}
+
+#inputArea {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.65fr);
+    gap: 1rem;
+    padding: 1rem;
+    align-items: start;
+}
+
+#controlOpt {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-muted);
+}
+
+.field-block {
+    min-width: 0;
+}
+
+.field-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.field-label {
+    color: var(--text);
+    font-weight: 800;
+}
+
+.field-note {
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+#cytoCol {
+    min-width: 0;
+    margin: 0;
+    padding: 1rem;
+}
+
+#cytoCol legend {
+    padding: 0 0.45rem;
+    font-weight: 850;
+}
+
+#outputDiv {
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+    gap: 0.75rem;
+    margin-top: 1rem;
+}
+
+#viewer {
+    min-width: 0;
+    height: clamp(420px, 62vh, 760px);
+    padding: 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--viewer-bg);
+}
+
+.cy_canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#relOutput {
+    min-width: 150px;
+    min-height: 100%;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-muted);
+    font-family: var(--mono);
+    color: var(--text);
+    font-size: 0.92rem;
+    resize: horizontal;
+    overflow: auto;
+    padding: 0.65rem;
+}
+
+#relOutput.add-relation-mode {
+    border-color: var(--accent);
+    background: var(--relation-add-bg);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+}
+
+.relation-editor {
+    min-height: 5.5rem;
+    margin-top: 0.6rem;
+    border: 1px dashed var(--accent);
+    border-radius: 6px;
+    background: var(--input-bg);
+    color: var(--text) !important;
+    padding: 0.55rem;
+    outline: none;
+    white-space: pre-wrap;
+}
+
+.relation-editor:focus {
+    border-style: solid;
+    box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.relation-editor:empty::before {
+    content: "Type new relation(s). Use one relation per line, or separate relations with commas.";
+    color: var(--muted);
+    pointer-events: none;
+}
+
+#outTxtBox {
+    min-height: 100%;
+    max-height: 11.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    background: var(--surface-muted);
+    overflow-y: auto;
+    overflow-wrap: break-word;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+}
+
+#relOutput div:nth-child(2n + 1) {
+    color: var(--relation-color-secondary);
+}
+
+#relOutput div:nth-child(2n) {
+    color: var(--relation-color-primary);
+}
+
+.control-group {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(250px, 25em);
+    gap: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.control-panel {
+    display: flex;
+    flex-direction: row;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: stretch;
+}
+
+.control-group details,
+.control-group .control-box {
+    border: 1px solid var(--border);
+    padding: 0.75rem;
+    background: var(--surface-muted);
+    border-radius: var(--radius);
+}
+
+.control-title,
+.control-group summary {
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.88rem;
+    font-weight: 850;
+    margin-bottom: 0.55rem;
+}
+
+.control-stack {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.option-list {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.indented-option {
+    margin-left: 1.45rem;
+}
+
+.help-panel {
+    margin-top: 16px;
+    padding: 0.9rem 1rem;
+}
+
+.help-panel summary {
+    cursor: pointer;
+    font-weight: 850;
+}
+
+.help-content {
+    display: grid;
+    gap: 0.8rem;
+    margin-top: 0.8rem;
+    color: var(--muted);
+}
+
+.help-section {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.help-section-title {
+    color: var(--text);
+    font-weight: 850;
+}
+
+.help-content .codetext {
+    color: var(--text);
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.05rem 0.25rem;
+    overflow-wrap: anywhere;
+}
+
+.help-content .code-block {
+    display: block;
+    margin: 0.35rem 0;
+    padding: 0.35rem 0.45rem;
+}
+
+@media (max-width: 840px) {
+    .app-shell {
+        width: min(100% - 20px, 1280px);
+        padding-top: 18px;
+    }
+
+    .app-header,
+    #midCol,
+    .control-group {
+        align-items: stretch;
+        flex-direction: column;
+        grid-template-columns: 1fr;
+    }
+
+    #inputArea,
+    #outputDiv {
+        grid-template-columns: 1fr;
+    }
+
+    #relOutput {
+        min-height: 9rem;
+        resize: vertical;
+    }
+}

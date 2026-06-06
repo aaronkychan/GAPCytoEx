@@ -1,0 +1,387 @@
+<!doctype html>
+<html>
+    <head>
+        <title>GAP to Cytoscape Quiver Viewer</title>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <link rel="stylesheet" type="text/css" href="./GAPToCyto.css" />
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
+        <script
+            src="https://cdn.jsdelivr.net/npm/cytoscape-svg@0.4.0/cytoscape-svg.min.js"
+            defer
+        ></script>
+        <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+        <script src="./GAPToCyto.js" defer></script>
+    </head>
+
+    <body>
+        <main class="app-shell">
+            <header class="app-header">
+                <div>
+                    <h1 class="app-title">GAP to Cytoscape Quiver Viewer</h1>
+                    <p class="app-subtitle">
+                        Translate QPA quiver output into an editable graph,
+                        inspect relations, and export the result as JSON or SVG.
+                    </p>
+                </div>
+                <div class="header-actions">
+                    <button
+                        id="themeToggle"
+                        class="theme-toggle"
+                        type="button"
+                        aria-pressed="false"
+                    >
+                        Dark theme
+                    </button>
+                </div>
+            </header>
+
+            <section class="accordionGroup panel">
+                <input
+                    type="checkbox"
+                    name="accInput"
+                    id="accInput"
+                    class="accordionTrigger"
+                    checked
+                />
+                <label for="accInput" class="accordionLabel">INPUT</label>
+                <div class="accordionPanel">
+                    <div id="inputArea">
+                        <div id="controlOpt">
+                            <label>
+                                <input type="checkbox" id="forceID" value="" />
+                                Force vertices to be labelled by numbers
+                            </label>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    id="forceArrow"
+                                    value=""
+                                />
+                                Force arrows to be labelled by alphabets
+                            </label>
+                            <span id="controlOutput" class="status-text"></span>
+                        </div>
+
+                        <div id="divInputQuiver" class="field-block">
+                            <div class="field-heading">
+                                <div>
+                                    <div class="field-label">
+                                        QPA quiver with relations
+                                    </div>
+                                    <div class="field-note">
+                                        Relations detected here override the
+                                        relation array.
+                                    </div>
+                                </div>
+                                <input
+                                    type="button"
+                                    value="Clear quiver"
+                                    onclick="
+                                        document.getElementById(
+                                            'inQuiver',
+                                        ).value = ''
+                                    "
+                                />
+                            </div>
+                            <textarea
+                                id="inQuiver"
+                                value=""
+                                cols="50"
+                                rows="4"
+                                placeholder="Quiver([..vx..], [ [src,tgt,name],[...],...])\n[...relations...]"
+                            >
+Quiver(["v1","v2","v3","v4"], [["v1","v3","a"],["v3","v2","b"],["v2","v1","c"],["v3","v4","d"],["v3","v4","e"]])
+[(+1)*a*b, (+1)*a*d+(-1)*a*e]
+                            </textarea>
+                        </div>
+
+                        <div class="field-block">
+                            <div class="field-heading">
+                                <div>
+                                    <div class="field-label">Relation array</div>
+                                    <div class="field-note">
+                                        Optional fallback input.
+                                    </div>
+                                </div>
+                                <input
+                                    type="button"
+                                    value="Clear relations"
+                                    onclick="
+                                        document.getElementById(
+                                            'inRelation',
+                                        ).value = ''
+                                    "
+                                />
+                            </div>
+                            <textarea
+                                id="inRelation"
+                                value=""
+                                cols="10"
+                                rows="4"
+                                placeholder="[a*b,...]"
+                            ></textarea>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div id="midCol">
+                <input
+                    type="button"
+                    value="Reset All"
+                    onclick="clearAll()"
+                />
+                <span class="action-help">
+                    Use mousewheel to zoom in/out. Click-and-drag on canvas/edge
+                    to pan.
+                    <br />
+                    Shortening the distance between vertices connected by multiple
+                    arrows may clarify the arrows.
+                </span>
+                <button id="translateBtn" class="button-primary">
+                    Draw
+                </button>
+                <button id="toQPABtn" disabled>
+                    Translate to QPA Quiver
+                </button>
+            </div>
+
+            <fieldset id="cytoCol" class="panel">
+                <legend>Output</legend>
+                <div class="control-group">
+                    <div class="control-panel">
+                        <div class="control-box">
+                            <div class="control-title">Canvas</div>
+                            <div class="control-stack">
+                                <input
+                                    type="button"
+                                    value="Clear Output"
+                                    onclick="
+                                        document.getElementById(
+                                            'outTxtBox',
+                                        ).innerHTML = ''
+                                    "
+                                />
+                                <input
+                                    type="button"
+                                    id="fixCyto"
+                                    value="Fit canvas"
+                                    disabled
+                                />
+                                <input
+                                    type="button"
+                                    id="wriggle"
+                                    value="Wriggle graph"
+                                    disabled
+                                />
+                            </div>
+                        </div>
+
+                        <details>
+                            <summary>File</summary>
+                            <div class="control-stack">
+                                <label>
+                                    Filename
+                                    <input
+                                        type="text"
+                                        id="filenameInput"
+                                        value="quiver"
+                                        size="10"
+                                    />
+                                </label>
+                                <input
+                                    type="button"
+                                    id="saveJSON"
+                                    value="Save as JSON"
+                                />
+                                <input
+                                    type="button"
+                                    id="saveSVG"
+                                    value="Save as SVG"
+                                    disabled
+                                />
+                                <span class="field-note">
+                                    SVG can be converted with
+                                    <a href="https://github.com/xyz2tex/svg2tikz"
+                                        >svg2tikz</a
+                                    >.
+                                </span>
+                                <label>
+                                    Load from JSON
+                                    <input
+                                        id="loadJsonBtn"
+                                        type="file"
+                                        accept="application/json"
+                                    />
+                                </label>
+                            </div>
+                        </details>
+
+                        <details>
+                            <summary>Bend edges</summary>
+                            <div class="control-stack">
+                                <span class="field-note">
+                                    Select an edge first.
+                                </span>
+                                <input
+                                    type="button"
+                                    id="bendLeft"
+                                    value="Bend left"
+                                />
+                                <input
+                                    type="button"
+                                    id="bendRight"
+                                    value="Bend right"
+                                />
+                            </div>
+                        </details>
+
+                        <div class="control-box">
+                            <div class="control-title">Edit quiver</div>
+                            <div class="option-list">
+                                <input
+                                    type="button"
+                                    id="btnDoubleQuiver"
+                                    value="Double quiver"
+                                />
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="editMode"
+                                        value="default"
+                                        checked
+                                    />
+                                    Move objects
+                                </label>
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="editMode"
+                                        value="add"
+                                    />
+                                    Add object
+                                </label>
+                                <label class="indented-option">
+                                    <input type="checkbox" id="autoName" checked />
+                                    Auto-name
+                                </label>
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="editMode"
+                                        value="rename"
+                                    />
+                                    Rename object
+                                </label>
+                                <label>
+                                    <input
+                                        type="radio"
+                                        name="editMode"
+                                        value="delete"
+                                    />
+                                    Delete object
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="control-box">
+                            <div class="control-title">Relations</div>
+                            <div class="control-stack">
+                                <input
+                                    type="button"
+                                    id="btnAddReln"
+                                    value="Add relation(s)"
+                                />
+                                <input
+                                    type="button"
+                                    id="btnEditReln"
+                                    value="Edit relation"
+                                />
+                                <input
+                                    type="button"
+                                    id="btnUnselectRelns"
+                                    value="Unselect all relations"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div id="outTxtBox"></div>
+                </div>
+                <div id="outputDiv">
+                    <div id="relOutput" contenteditable="false">Relations:</div>
+                    <div id="viewer">
+                        <div id="cy" class="cy_canvas"></div>
+                    </div>
+                </div>
+            </fieldset>
+
+            <details class="help-panel panel">
+                <summary>Instruction and Limitation</summary>
+                <div class="help-content">
+                    <div class="help-section">
+                        <div class="help-section-title">Quiver Input</div>
+                        <div>For quiver input with relations:</div>
+                        <div class="codetext code-block">
+                            Quiver( [.. list of vertices ..],
+                            [..[src,tar,arr_name]..] ) [ ... list of relations ... ]
+                        </div>
+                        <div>
+                            "<span class="codetext">Quiver()</span>" can be
+                            omitted. Relations must be the last array and cannot
+                            be 2-dimensional. Relations in the QPA quiver code
+                            have priority over those in the relation array.
+                        </div>
+                    </div>
+
+                    <div class="help-section">
+                        <div class="help-section-title">Relation Syntax</div>
+                        <div>
+                            Relations can be written in the format
+                            "<span class="codetext"
+                                >(scalar1)*arrow1*arrow2*... +
+                                (scalar2)*...</span
+                            >".
+                            Scalar coefficients are optional; a monomial such as
+                            "<span class="codetext">a*b</span>" is treated as
+                            "<span class="codetext">(+1)*a*b</span>", and
+                            "<span class="codetext">a*b - c*d</span>" is treated as
+                            "<span class="codetext"
+                                >(+1)*a*b+(-1)*c*d</span
+                            >".
+                        </div>
+                    </div>
+
+                    <div class="help-section">
+                        <div class="help-section-title">Relation Editing</div>
+                        <div>
+                            To edit a relation, select one relation in the
+                            relation display, then press Edit relation.
+                        </div>
+                        <div>
+                            To add relation(s), press Add relation(s), then type
+                            in the highlighted entry area. Press Enter to save.
+                            Press Shift+Enter to insert a new line. You can use
+                            one relation per line or separate relations with
+                            commas.
+                        </div>
+                    </div>
+
+                    <div class="help-section">
+                        <div class="help-section-title">
+                            Warnings and Limitations
+                        </div>
+                        <div>
+                            Finite field detection is available only for
+                            characteristics at most 61.
+                        </div>
+                        <div>
+                            Comments and issues: aaron dot kychan at gmail dot
+                            com.
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </main>
+    </body>
+</html>

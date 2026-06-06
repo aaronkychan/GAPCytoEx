@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GAPCytoEx</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main id="app" class="app-shell">
+      <header class="app-header">
+        <div>
+          <h1>QPA &lt;-&gt; Cytoscape Quiver Translator</h1>
+          <p>Stage 1 scaffold. Original translator behavior is preserved under legacy assets.</p>
+        </div>
+        <div class="toolbar" aria-label="Path orientation">
+          <button type="button" data-orientation="L2R" aria-pressed="true">L2R</button>
+          <button type="button" data-orientation="R2L" aria-pressed="false">R2L</button>
+        </div>
+      </header>
+      <section class="workbench" aria-label="Translator workbench">
+        <aside class="panel">
+          <h2>Relations</h2>
+          <p id="relation-orientation">Display convention: L2R</p>
+        </aside>
+        <section class="canvas-panel">
+          <h2>Cytoscape canvas</h2>
+          <p>Canvas integration begins after the legacy translator is wrapped without semantic changes.</p>
+        </section>
+        <aside class="panel">
+          <h2>Output</h2>
+          <label>
+            maxPathLength
+            <input id="max-path-length" type="number" min="20" value="50" />
+          </label>
+          <p id="info-status">Ready.</p>
+        </aside>
+      </section>
+    </main>
+    <script type="module" src="./assets/app.js"></script>
+  </body>
+</html>

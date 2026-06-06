@@ -1,0 +1,13 @@
+{
+  "name": "gap-cyto-ex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun build ./src/frontend/app.ts --outdir ./public/assets --target browser --sourcemap",
+    "check": "bun test && bun run build",
+    "dev": "bun --watch ./scripts/dev-server.ts",
+    "test": "bun test"
+  },
+  "devDependencies": {}
+}

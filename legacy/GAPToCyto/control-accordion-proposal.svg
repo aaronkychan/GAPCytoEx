@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="940" viewBox="0 0 1440 940" role="img" aria-labelledby="title desc">
+  <title id="title">Proposed accordion control organization for the monomial algebra frontend</title>
+  <desc id="desc">A desktop mockup preserving the current layout while grouping low-frequency controls into folded accordions and keeping edit controls visible.</desc>
+  <defs>
+    <linearGradient id="canvasBg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#e7f0f7"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#23344f" flood-opacity="0.12"/>
+    </filter>
+    <style>
+      .bg { fill: #eef3f7; }
+      .panel { fill: #ffffff; stroke: #cfd8e3; stroke-width: 1.4; filter: url(#shadow); }
+      .panel-flat { fill: #ffffff; stroke: #cfd8e3; stroke-width: 1.4; }
+      .muted-panel { fill: #f8fafc; stroke: #d7e0ea; stroke-width: 1.2; }
+      .header { fill: #182334; }
+      .title { font: 700 26px "Segoe UI", Arial, sans-serif; fill: #f8fafc; }
+      .subtitle { font: 14px "Segoe UI", Arial, sans-serif; fill: #b8c5d6; }
+      .section-title { font: 800 15px "Segoe UI", Arial, sans-serif; fill: #1d2a3a; letter-spacing: 0.2px; }
+      .label { font: 13px "Segoe UI", Arial, sans-serif; fill: #344256; }
+      .small { font: 12px "Segoe UI", Arial, sans-serif; fill: #637184; }
+      .tiny { font: 11px "Segoe UI", Arial, sans-serif; fill: #7a8798; }
+      .button { fill: #eef4fb; stroke: #c9d6e4; stroke-width: 1; }
+      .button-primary { fill: #0f766e; stroke: #0b5f59; stroke-width: 1; }
+      .button-warn { fill: #fff7ed; stroke: #fed7aa; stroke-width: 1; }
+      .button-text { font: 700 12px "Segoe UI", Arial, sans-serif; fill: #1d2a3a; }
+      .button-text-light { font: 800 12px "Segoe UI", Arial, sans-serif; fill: #ffffff; }
+      .badge { fill: #ecfdf5; stroke: #a7f3d0; stroke-width: 1; }
+      .badge-text { font: 700 11px "Segoe UI", Arial, sans-serif; fill: #047857; }
+      .accordion { fill: #f3f6fa; stroke: #d8e1ec; stroke-width: 1; }
+      .accordion-text { font: 750 13px "Segoe UI", Arial, sans-serif; fill: #2d3b4f; }
+      .collapsed-text { font: 12px "Segoe UI", Arial, sans-serif; fill: #718096; }
+      .info-head { font: 800 14px "Segoe UI", Arial, sans-serif; fill: #1d2a3a; }
+      .mono { font: 12px "Cascadia Mono", Consolas, monospace; fill: #334155; }
+      .node { fill: #ffffff; stroke: #2563eb; stroke-width: 3; }
+      .edge { stroke: #334155; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .edge-hot { stroke: #0f766e; stroke-width: 4; fill: none; marker-end: url(#arrowHot); }
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowHot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#0f766e"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1440" height="940"/>
+
+  <rect class="header" x="30" y="24" width="1380" height="82" rx="12"/>
+  <text class="title" x="58" y="62">Monomial Algebra Workbench</text>
+  <text class="subtitle" x="58" y="87">Keep the current workflow, but make control groups easier to scan and debug</text>
+  <rect class="button" x="1228" y="47" width="74" height="34" rx="7"/>
+  <text class="button-text" x="1249" y="69">Load</text>
+  <rect class="button" x="1314" y="47" width="66" height="34" rx="7"/>
+  <text class="button-text" x="1336" y="69">Save</text>
+
+  <rect class="panel-flat" x="30" y="122" width="1380" height="52" rx="10"/>
+  <text class="section-title" x="56" y="154">Advanced text input</text>
+  <text class="small" x="230" y="154">Folded by default once graphical editing is the primary path</text>
+  <text class="accordion-text" x="1365" y="154">›</text>
+
+  <rect class="panel" x="30" y="194" width="1380" height="708" rx="14"/>
+  <text class="section-title" x="56" y="226">Output workbench</text>
+
+  <rect class="muted-panel" x="56" y="246" width="892" height="226" rx="10"/>
+  <text class="section-title" x="78" y="274">Controls</text>
+  <text class="small" x="148" y="274">High-frequency tools stay open; low-frequency tools fold away</text>
+
+  <rect class="panel-flat" x="78" y="294" width="236" height="156" rx="9"/>
+  <text class="section-title" x="98" y="322">Edit object</text>
+  <text class="small" x="184" y="322">always open</text>
+  <rect class="button-primary" x="98" y="342" width="86" height="30" rx="7"/>
+  <text class="button-text-light" x="119" y="362">Add vertex</text>
+  <rect class="button-primary" x="194" y="342" width="86" height="30" rx="7"/>
+  <text class="button-text-light" x="216" y="362">Add arrow</text>
+  <rect class="button" x="98" y="382" width="86" height="30" rx="7"/>
+  <text class="button-text" x="125" y="402">Rename</text>
+  <rect class="button-warn" x="194" y="382" width="86" height="30" rx="7"/>
+  <text class="button-text" x="220" y="402">Delete</text>
+  <text class="tiny" x="98" y="434">Mode and selection status shown inline.</text>
+
+  <rect class="panel-flat" x="332" y="294" width="248" height="156" rx="9"/>
+  <text class="section-title" x="352" y="322">Algebra</text>
+  <rect class="button-primary" x="352" y="342" width="190" height="34" rx="8"/>
+  <text class="button-text-light" x="375" y="365">Confirm monomial algebra</text>
+  <rect class="badge" x="352" y="388" width="82" height="24" rx="12"/>
+  <text class="badge-text" x="371" y="405">Confirmed</text>
+  <text class="small" x="352" y="432">4 vertices, 4 arrows, 2 relations</text>
+
+  <rect class="panel-flat" x="598" y="294" width="326" height="156" rx="9"/>
+  <text class="section-title" x="618" y="322">Compute</text>
+  <text class="small" x="618" y="350">n</text>
+  <rect class="button" x="640" y="331" width="42" height="28" rx="6"/>
+  <text class="button-text" x="656" y="350">3</text>
+  <rect class="button" x="694" y="331" width="166" height="28" rx="6"/>
+  <text class="button-text" x="718" y="350">Compute ambiguities</text>
+  <text class="small" x="618" y="389">HH degree</text>
+  <rect class="button" x="688" y="370" width="42" height="28" rx="6"/>
+  <text class="button-text" x="704" y="389">4</text>
+  <rect class="button" x="742" y="370" width="82" height="28" rx="6"/>
+  <text class="button-text" x="759" y="389">Bardzell</text>
+  <rect class="button" x="834" y="370" width="72" height="28" rx="6"/>
+  <text class="button-text" x="852" y="389">HH</text>
+  <text class="tiny" x="618" y="432">Results go to the computation output box, not the info box.</text>
+
+  <rect class="accordion" x="78" y="460" width="202" height="34" rx="7"/>
+  <text class="accordion-text" x="96" y="482">› Canvas zoom / fit</text>
+  <text class="collapsed-text" x="232" y="482">folded</text>
+  <rect class="accordion" x="292" y="460" width="180" height="34" rx="7"/>
+  <text class="accordion-text" x="310" y="482">› File save / export</text>
+  <rect class="accordion" x="484" y="460" width="178" height="34" rx="7"/>
+  <text class="accordion-text" x="502" y="482">› Bend arrows</text>
+  <rect class="accordion" x="674" y="460" width="188" height="34" rx="7"/>
+  <text class="accordion-text" x="692" y="482">› Display options</text>
+
+  <rect class="muted-panel" x="970" y="246" width="190" height="226" rx="10"/>
+  <text class="info-head" x="990" y="274">Info</text>
+  <text class="small" x="990" y="304">Status</text>
+  <text class="mono" x="990" y="326">Confirmed</text>
+  <text class="small" x="990" y="356">Selected relation</text>
+  <text class="mono" x="990" y="378">a*b*c</text>
+  <text class="small" x="990" y="408">Selected ambiguity</text>
+  <text class="mono" x="990" y="430">a*b | c*d | a</text>
+
+  <rect class="muted-panel" x="1178" y="246" width="206" height="226" rx="10"/>
+  <text class="info-head" x="1198" y="274">Computation output</text>
+  <rect class="button" x="1312" y="256" width="48" height="24" rx="6"/>
+  <text class="button-text" x="1324" y="273">Clear</text>
+  <text class="small" x="1198" y="306">Ambiguities, n ≤ 2</text>
+  <text class="mono" x="1198" y="330">Γ[-1] 4 items</text>
+  <text class="mono" x="1198" y="352">Γ[0]  4 items</text>
+  <text class="mono" x="1198" y="374">Γ[1]  a*b | c</text>
+  <text class="mono" x="1238" y="396">c*d | a</text>
+  <rect class="button-primary" x="1198" y="414" width="156" height="28" rx="7"/>
+  <text class="button-text-light" x="1216" y="433">a*b | c*d | a</text>
+
+  <rect class="muted-panel" x="56" y="520" width="260" height="332" rx="10"/>
+  <text class="section-title" x="78" y="550">Relations</text>
+  <text class="small" x="78" y="574">Clickable relation list stays beside the canvas</text>
+  <rect class="button-primary" x="78" y="596" width="118" height="30" rx="7"/>
+  <text class="button-text-light" x="103" y="616">New relation</text>
+  <rect class="button" x="204" y="596" width="76" height="30" rx="7"/>
+  <text class="button-text" x="226" y="616">Undo</text>
+  <rect class="panel-flat" x="78" y="650" width="210" height="42" rx="7"/>
+  <text class="mono" x="96" y="676">r1: a*b*c</text>
+  <rect class="panel-flat" x="78" y="704" width="210" height="42" rx="7"/>
+  <text class="mono" x="96" y="730">r2: c*d*a</text>
+  <text class="tiny" x="78" y="786">Selecting a relation updates Info and highlights its path.</text>
+
+  <rect x="338" y="520" width="610" height="332" rx="10" fill="url(#canvasBg)" stroke="#cad7e3" stroke-width="1.4"/>
+  <text class="section-title" x="362" y="550">Cytoscape canvas</text>
+  <path class="edge-hot" d="M 489 668 C 548 584, 670 584, 728 668"/>
+  <path class="edge" d="M 728 668 C 788 750, 615 798, 552 724"/>
+  <path class="edge" d="M 552 724 C 489 792, 422 738, 489 668"/>
+  <circle class="node" cx="489" cy="668" r="27"/>
+  <circle class="node" cx="728" cy="668" r="27"/>
+  <circle class="node" cx="552" cy="724" r="27"/>
+  <text class="button-text" x="483" y="673">v1</text>
+  <text class="button-text" x="722" y="673">v2</text>
+  <text class="button-text" x="546" y="729">v3</text>
+  <text class="mono" x="596" y="615">flow highlight follows selected ambiguity</text>
+
+  <rect class="muted-panel" x="970" y="520" width="414" height="332" rx="10"/>
+  <text class="section-title" x="990" y="550">Output panel detail</text>
+  <text class="small" x="990" y="580">Tabs appear once more result types exist</text>
+  <rect class="button-primary" x="990" y="604" width="92" height="28" rx="7"/>
+  <text class="button-text-light" x="1008" y="623">Ambiguities</text>
+  <rect class="button" x="1090" y="604" width="76" height="28" rx="7"/>
+  <text class="button-text" x="1112" y="623">Bardzell</text>
+  <rect class="button" x="1174" y="604" width="96" height="28" rx="7"/>
+  <text class="button-text" x="1196" y="623">Cohomology</text>
+  <rect class="button" x="1278" y="604" width="62" height="28" rx="7"/>
+  <text class="button-text" x="1296" y="623">Cup</text>
+  <text class="mono" x="990" y="670">Γ[2]</text>
+  <rect class="panel-flat" x="990" y="690" width="354" height="42" rx="7"/>
+  <text class="mono" x="1008" y="716">1. a*b | c*d | a</text>
+  <rect class="panel-flat" x="990" y="744" width="354" height="42" rx="7"/>
+  <text class="mono" x="1008" y="770">2. c*d | a*b | c</text>
+  <text class="tiny" x="990" y="824">Rows are selectable; selection updates Info and canvas.</text>
+</svg>

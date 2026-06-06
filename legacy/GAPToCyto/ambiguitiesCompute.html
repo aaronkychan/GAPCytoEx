@@ -1,0 +1,889 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Draw QPA output</title>
+        <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+        <!-- <link rel="stylesheet" type="text/css" href="style.css" /> -->
+        <style type="text/css">
+            body {
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            }
+
+            .codetext {
+                font-family: "Courier New", Courier, monospace;
+            }
+
+            .site_row {
+                display: flex;
+                flex-direction: column;
+                margin: 2ch;
+            }
+
+            .box_row {
+                /* display: flex;
+            flex-direction: row; */
+                /* justify-content: space-between; */
+                margin: 3px;
+            }
+
+            .relationRow {
+                cursor: pointer;
+            }
+
+            .selectedRelationRow {
+                background: #ffff00;
+            }
+
+            #midCol {
+                /* display: grid;
+            align-self: center; */
+                display: flex;
+                flex-direction: row;
+                /* justify-content: space-between; */
+            }
+
+            /* CSS accordion:  https://codepen.io/raubaca/pen/PZzpVe */
+            .accordionGroup {
+                width: max(660px, 80%);
+            }
+
+            .accordionTrigger {
+                display: none;
+            }
+
+            .accordionLabel {
+                display: flex;
+                cursor: pointer;
+                padding: 0.5em 0 0.5em 1.5em;
+                font-weight: bold;
+                background-color: #bbb;
+                user-select: none;
+                justify-content: space-between;
+            }
+
+            .accordionLabel::after {
+                content: "\276F";
+                width: 1em;
+                height: 1em;
+                margin-top: 0.2em;
+                margin-right: 1em;
+                text-align: center;
+                transform: rotate(90deg);
+                transition: all 0.3s;
+                box-sizing: border-box;
+            }
+
+            .accordionPanel {
+                border: #999 1px solid;
+                max-height: 0;
+                overflow: hidden;
+                transition: all 0.3s;
+                margin-bottom: 1em;
+            }
+
+            .accordionTrigger:checked + .accordionLabel + .accordionPanel {
+                max-height: 10rem;
+                transition: all 0.3s;
+            }
+
+            .accordionTrigger:checked + .accordionLabel::after {
+                transform: rotate(270deg);
+                translate: -0.5em 0;
+            }
+
+            #inputArea {
+                display: grid;
+                grid-template-areas:
+                    "control control"
+                    "qpa cyto";
+                /* width: max(600px, 80%); */
+                /* justify-items: center; */
+                padding: 0.5em;
+                align-items: center;
+            }
+
+            #inputArea textarea {
+                width: 90%;
+            }
+
+            #controlOpt {
+                grid-area: control;
+                /* border: solid 1px blue; */
+                padding: 3px;
+                margin-bottom: 1ch;
+            }
+
+            #cytoCol {
+                min-width: 80%;
+            }
+
+            #outputDiv {
+                margin-top: 2ch;
+                border: 1px #000 solid;
+                display: flex;
+                flex-direction: row;
+                justify-items: center;
+                align-items: stretch;
+            }
+
+            #viewer {
+                min-width: 50%;
+                flex-grow: 1;
+                height: 480px;
+                margin: 5px;
+                padding: 5px;
+                border: 1px dashed #777;
+            }
+
+            .cy_canvas {
+                width: 100%;
+                height: 480px;
+                display: block;
+            }
+
+            #relOutput {
+                min-width: 150px;
+                min-height: 100%;
+                border: 1px #777 dotted;
+                font-family: monospace;
+                color: black;
+                font-size: 12pt;
+                margin: 3px;
+                resize: horizontal;
+                overflow: auto;
+            }
+
+            #outTxtBox {
+                max-width: 25em;
+                border: 1px solid #ccc;
+                padding: 5px;
+                background: #fff;
+                overflow-y: auto;
+                overflow-wrap: break-word;
+                font-family: "Courier New", Courier, monospace;
+            }
+
+            #relOutput div:nth-child(2n + 1) {
+                color: #0080ff;
+            }
+
+            #relOutput div:nth-child(2n) {
+                color: #ff6f00;
+            }
+
+            textarea {
+                margin-top: 5px;
+                margin-bottom: 10px;
+            }
+
+            .control-group {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 10px;
+                margin-bottom: 10px;
+            }
+
+            .control-panel {
+                display: flex;
+                flex-direction: row;
+                gap: 10px;
+                flex-wrap: wrap;
+                margin-bottom: 10px;
+            }
+
+            .control-group details,
+            .control-group .control-box {
+                border: 1px solid #ccc;
+                padding: 5px;
+                background: #f9f9f9;
+                border-radius: 4px;
+            }
+
+            #ambiguityNInput {
+                width: 2em;
+                text-align: right;
+            }
+
+            #ambiguityInfo {
+                min-width: 220px;
+                max-width: 34em;
+                max-height: 220px;
+                overflow: auto;
+                border: 1px solid #bbb;
+                background: #fff;
+                padding: 6px;
+                font-family: "Courier New", Courier, monospace;
+                font-size: 10pt;
+                line-height: 1.35;
+                white-space: pre-wrap;
+            }
+
+            #ambiguityInfo .ambiguityWarning {
+                color: #b00020;
+                font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+                font-weight: 600;
+            }
+        </style>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
+        <!-- <script src="https://cdn.jsdelivr.net/npm/cytoscape-klay@3.1.4/cytoscape-klay.min.js"></script> -->
+        <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js "></script>
+    <script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script> -->
+        <script
+            src=" https://cdn.jsdelivr.net/npm/cytoscape-svg@0.4.0/cytoscape-svg.min.js"
+            defer
+        ></script>
+        <script src=" https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js "></script>
+        <script src="./GAPToCyto.js" defer></script>
+    </head>
+
+    <body>
+        <div class="site_row">
+            <div class="accordionGroup">
+                <input
+                    type="checkbox"
+                    name="accInput"
+                    id="accInput"
+                    class="accordionTrigger"
+                    checked
+                />
+                <label for="accInput" class="accordionLabel">INPUT</label>
+                <div class="accordionPanel">
+                    <div id="inputArea">
+                        <div id="controlOpt">
+                            <label>
+                                <input type="checkbox" id="forceID" value="" />
+                                Force vertices to be labelled by numbers
+                            </label>
+                            &nbsp;&nbsp;
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    id="forceArrow"
+                                    value=""
+                                />
+                                Force arrows to be labelled by alphabets
+                            </label>
+                            &nbsp;&nbsp;
+                            <span
+                                id="controlOutput"
+                                style="
+                                    color: red;
+                                    font-family: monospace;
+                                    font-size: 12pt;
+                                "
+                            ></span>
+                        </div>
+
+                        <div id="divInputQuiver">
+                            <input
+                                type="button"
+                                value="Clear quiver"
+                                onclick="
+                                    document.getElementById('inQuiver').value =
+                                        ''
+                                "
+                            />
+                            &nbsp;&nbsp;QPA quiver (with relation)<br />
+                            <textarea
+                                id="inQuiver"
+                                value=""
+                                cols="50"
+                                rows="4"
+                                placeholder="Quiver([..vx..], [ [src,tgt,name],[...],...])\n[...relations...]"
+                            >
+Quiver(["v1","v2","v3","v4","v5"], [["v1","v2","a1"],["v2","v1","b1"],["v2","v3","a2"],["v3","v2","b2"],["v3","v4","a3"],["v4","v3","b3"],["v4","v5","a4"],["v5","v4","b4"],["v5","v1","a5"],["v1","v5","b5"]])
+[(+1)*a1*a2*a3, (+1)*a2*a3*a4, (+1)*a3*a4*a5, (+1)*a3*a4*a5, (+1)*a4*a5*a1, (+1)*a5*a1*a2,
+(+1)*b3*b2*b1, (+1)*b2*b1*b5, (+1)*b1*b5*b4, (+1)*b5*b4*b3, (+1)*b4*b3*b2, (+1)*b2*b1*b5,
+(+1)*a1*b1, (+1)*b1*a1, (+1)*a2*b2, (+1)*b2*a2, (+1)*a3*b3, (+1)*b3*a3, (+1)*a4*b4, (+1)*b4*a4, (+1)*a5*b5, (+1)*b5*a5]
+                </textarea
+                            >
+                        </div>
+
+                        <div>
+                            <input
+                                type="button"
+                                value="Clear relations"
+                                onclick="
+                                    document.getElementById(
+                                        'inRelation',
+                                    ).value = ''
+                                "
+                            />
+                            &nbsp;&nbsp;Relation array (obsolete if relations
+                            are detected in quiver input)<br />
+                            <textarea
+                                id="inRelation"
+                                value=""
+                                cols="10"
+                                rows="4"
+                                placeholder="[a*b,...]"
+                            ></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="midCol">
+                <input
+                    type="button"
+                    value="Reset All"
+                    onclick="clearAll()"
+                    style="margin: 5px; padding: 0.5ch"
+                />
+                &nbsp;&nbsp;&nbsp;
+                <!-- <input type="button" id="testBtn" value="TEST" style="margin: 5px; padding:.5ch;" /> -->
+                <span style="margin-top: 4px">
+                    Use mousewheel to zoom in/out. Click-and-drag on canvas/edge
+                    to pan.
+                    <br />
+                    Shorten distance between vertices connected by multple
+                    arrows may clarify the arrows.
+                </span>
+                &nbsp;&nbsp;&nbsp;
+                <button
+                    id="translateBtn"
+                    style="margin: 5px; padding: 0.5ch; font-size: large"
+                >
+                    Draw
+                </button>
+                &nbsp;&nbsp;&nbsp;
+                <button
+                    id="toQPABtn"
+                    style="margin: 5px; padding: 0.5ch; font-size: large"
+                    disabled
+                >
+                    Translate to QPA Quiver
+                </button>
+            </div>
+
+            <fieldset id="cytoCol">
+                <legend>Output</legend>
+                <div class="control-group">
+                    <div class="control-panel">
+                        <div class="control-box">
+                            Canvas <br />
+                            <input
+                                type="button"
+                                value="Clear Output"
+                                onclick="
+                                    document.getElementById(
+                                        'outTxtBox',
+                                    ).innerHTML = ''
+                                "
+                            />
+                            <br />
+                            <input
+                                type="button"
+                                id="fixCyto"
+                                value="Fit canvas"
+                                disabled
+                            />
+                            <br />
+                            <input
+                                type="button"
+                                id="wriggle"
+                                value="Wriggle graph"
+                                disabled
+                            />
+                        </div>
+
+                        <details>
+                            <summary>File</summary>
+                            <b>Save</b><br />
+                            Filename:
+                            <input
+                                type="text"
+                                id="filenameInput"
+                                value="quiver"
+                                size="10"
+                            />
+                            <br />
+                            <input
+                                type="button"
+                                id="saveJSON"
+                                value="Save as JSON"
+                            />
+                            <input
+                                type="button"
+                                id="saveSVG"
+                                value="Save as SVG"
+                                disabled
+                            />
+                            <br />
+                            (Use
+                            <a href="https://github.com/xyz2tex/svg2tikz"
+                                >svg2tikz</a
+                            >)
+                            <hr style="margin: 5px 0" />
+                            <b>Load</b><br />
+                            Load from JSON:
+                            <input
+                                id="loadJsonBtn"
+                                type="file"
+                                accept="application/json"
+                            />
+                        </details>
+
+                        <details>
+                            <summary>Bend edges</summary>
+                            Bend edge more (select edge first):<br />
+                            <input
+                                type="button"
+                                id="bendLeft"
+                                value="Bend left"
+                            />
+                            <input
+                                type="button"
+                                id="bendRight"
+                                value="Bend right"
+                            />
+                        </details>
+
+                        <div class="control-box">
+                            Edit quiver<br />
+                            <label>
+                                <input
+                                    type="radio"
+                                    name="editMode"
+                                    value="default"
+                                    checked
+                                />
+                                Move objects
+                            </label>
+                            <br />
+                            <label>
+                                <input
+                                    type="radio"
+                                    name="editMode"
+                                    value="add"
+                                />
+                                Add object
+                            </label>
+                            <br />
+                            <label style="margin-left: 0.5em">
+                                <input type="checkbox" id="autoName" checked />
+                                Auto-name
+                            </label>
+                            <br />
+                            <label>
+                                <input
+                                    type="radio"
+                                    name="editMode"
+                                    value="rename"
+                                />
+                                Rename object
+                            </label>
+                            <br />
+                            <label>
+                                <input
+                                    type="radio"
+                                    name="editMode"
+                                    value="delete"
+                                />
+                                Delete object
+                            </label>
+                        </div>
+
+                        <div class="control-box">
+                            Relations control<br />
+                            <input
+                                type="button"
+                                id="btnUnselectRelns"
+                                value="Unselect all relations"
+                            />
+                        </div>
+
+                        <div class="control-box">
+                            Ambiguities<br />
+                            n =
+                            <input
+                                type="number"
+                                id="ambiguityNInput"
+                                min="1"
+                                max="10"
+                                value="3"
+                                size="2"
+                            />
+                            <br />
+                            <input
+                                type="button"
+                                id="computeAmbiguitiesBtn"
+                                value="Compute n-ambiguities"
+                            />
+                        </div>
+                    </div>
+                    <div id="outTxtBox"></div>
+                </div>
+                <div id="outputDiv">
+                    <div id="relOutput" contenteditable="true">Relations:</div>
+                    <div id="viewer">
+                        <div id="cy" class="cy_canvas"></div>
+                    </div>
+                    <div id="ambiguityInfo">Ambiguities:</div>
+                </div>
+            </fieldset>
+        </div>
+
+        Input format:<br />
+        <div class="site_row">
+            <div
+                style="
+                    border: 1px #000000 solid;
+                    padding: 6px;
+                    position: relative;
+                    top: 2px;
+                "
+            >
+                For quiver (with relations):
+                <div class="codetext">
+                    Quiver( [.. list of vertices ..], [..[src,tar,arr_name]..] )
+                    [ ... list of relations ... ]
+                </div>
+                "<span class="codetext">Quiver()</span>" can be omitted. <br />
+                Relations must be the last array and cannot be 2-dimensional.
+                <br />
+                Relations in the "QPA Quiver code" has priority over those in
+                "Relation code". <br />
+                Relations must be in the format "<span class="codetext"
+                    >(scalar1)*arrow1*arrow2*... + (scalar2)*...</span
+                >"
+            </div>
+            <!-- <div
+            style="border:1px #000000 solid; padding:6px; position:relative; top:2px; margin-bottom:5px; margin-left: 10px; ">
+            Relation format:
+            <div style="font-family: 'Courier New', Courier, monospace; margin-top:5px; margin-bottom:5px "> [ ... list
+                of relations ... ] </div>
+        </div> -->
+        </div>
+        <div>
+            Known Limitation:<br />
+            - Can only detect finite field of characteristic at most 61<br />
+            - Email me (aaron dot kychan at gmail dot com) for comments and
+            issues
+        </div>
+        <script>
+            function ambiguityPathKey(path) {
+                return path.length === 0 ? "1" : path.join("*");
+            }
+
+            function ambiguityPieceKey(piece) {
+                return Array.isArray(piece)
+                    ? ambiguityPathKey(piece)
+                    : String(piece);
+            }
+
+            function ambiguityDecompositionKey(pieces) {
+                return pieces.map(ambiguityPieceKey).join(" | ");
+            }
+
+            function ambiguityContainsSubpath(path, subpath) {
+                if (subpath.length === 0 || subpath.length > path.length) {
+                    return false;
+                }
+                for (let i = 0; i <= path.length - subpath.length; i++) {
+                    let found = true;
+                    for (let j = 0; j < subpath.length; j++) {
+                        if (path[i + j] !== subpath[j]) {
+                            found = false;
+                            break;
+                        }
+                    }
+                    if (found) return true;
+                }
+                return false;
+            }
+
+            function ambiguityArraysEqual(left, right) {
+                return (
+                    left.length === right.length &&
+                    left.every((value, index) => value === right[index])
+                );
+            }
+
+            function ambiguityPrefix(path, length) {
+                return path.slice(0, length);
+            }
+
+            function ambiguitySuffix(path, length) {
+                return path.slice(path.length - length);
+            }
+
+            function ambiguityCommonOverlapLengths(path, relation) {
+                // A valid extension glues the end of the current ambiguity path
+                // to the start of a minimal relation. The overlap must be
+                // proper on the relation side, otherwise there is no new tail.
+                const maxLength = Math.min(path.length, relation.length - 1);
+                const lengths = [];
+                for (let len = maxLength; len >= 1; len--) {
+                    if (
+                        ambiguityArraysEqual(
+                            ambiguitySuffix(path, len),
+                            ambiguityPrefix(relation, len),
+                        )
+                    ) {
+                        lengths.push(len);
+                    }
+                }
+                return lengths;
+            }
+
+            function ambiguityBuildQuiverModel() {
+                if (!cy) throw new Error("Draw or load a quiver first.");
+                // Read the current Cytoscape graph into plain quiver data.
+                // The ambiguity code below works only with arrow IDs.
+                const arrows = cy.edges().map((edge) => ({
+                    id: edge.id(),
+                    source: edge.source().id(),
+                    target: edge.target().id(),
+                }));
+                return {
+                    vertices: cy.nodes().map((node) => node.id()),
+                    arrows,
+                };
+            }
+
+            function ambiguityRelationToPieces(path) {
+                // Gamma[1] is not stored arrow-by-arrow. A relation
+                // a1...am is represented as the two-piece ambiguity
+                // a1...a_{m-1} | am, matching the current spec.
+                return [path.slice(0, path.length - 1), path.slice(-1)];
+            }
+
+            function ambiguityExtendPiecesByRelation(ambiguity, relation) {
+                const extensions = [];
+                for (const overlapLength of ambiguityCommonOverlapLengths(
+                    ambiguity.path,
+                    relation,
+                )) {
+                    // If p ends in the same word as the beginning of r,
+                    // append only the part of r not already present in p.
+                    const tail = relation.slice(overlapLength);
+                    if (tail.length === 0) continue;
+
+                    const oldPieces = ambiguity.pieces;
+                    const lastPiece = oldPieces[oldPieces.length - 1];
+                    if (!Array.isArray(lastPiece)) continue;
+
+                    // The ambiguity separator moves to the last arrow of the
+                    // appended relation tail. The previous last piece absorbs
+                    // the tail except for that final arrow.
+                    const grownLastPiece = lastPiece.concat(
+                        tail.slice(0, tail.length - 1),
+                    );
+                    const finalPiece = tail.slice(tail.length - 1);
+                    const pieces = oldPieces
+                        .slice(0, oldPieces.length - 1)
+                        .concat([grownLastPiece, finalPiece]);
+
+                    extensions.push({
+                        path: ambiguity.path.concat(tail),
+                        pieces,
+                    });
+                }
+                return extensions;
+            }
+
+            function ambiguityExtractMonomialRelations() {
+                const warnings = [];
+                if (!Relations || Relations.length === 0)
+                    return { relations: [], warnings, blocked: false };
+                const relationPaths = [];
+                let blocked = false;
+                for (const rel of Relations) {
+                    // The POC only accepts monomial relations. Existing parser
+                    // output stores a monomial as rel.terms[0].monomial.
+                    if (!rel.terms || rel.terms.length !== 1) {
+                        warnings.push(
+                            `Cannot compute ambiguities: relation ${rel.reln} is not monomial.`,
+                        );
+                        blocked = true;
+                    } else if (rel.terms[0].monomial.length < 2) {
+                        warnings.push(
+                            `Cannot compute ambiguities: relation ${rel.reln} has length < 2.`,
+                        );
+                        blocked = true;
+                    }
+                }
+                if (blocked) {
+                    return { relations: [], warnings, blocked: true };
+                }
+
+                for (const rel of Relations) {
+                    const path = rel.terms[0].monomial.slice();
+                    relationPaths.push(path);
+                }
+                // Normalize to the minimal monomial antichain: if one relation
+                // properly contains a shorter relation, only the shorter
+                // divisor belongs in the generating relation set.
+                const minimal = relationPaths.filter(
+                    (path, i) =>
+                        !relationPaths.some(
+                            (other, j) =>
+                                i !== j &&
+                                other.length < path.length &&
+                                ambiguityContainsSubpath(path, other),
+                        ),
+                );
+                const seen = new Set();
+                return {
+                    // Remove exact duplicates after antichain normalization.
+                    relations: minimal.filter((path) => {
+                        const key = ambiguityPathKey(path);
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                    }),
+                    warnings,
+                    blocked: false,
+                };
+            }
+
+            function ambiguityComputeUpTo(maxN) {
+                const { relations, warnings, blocked } =
+                    ambiguityExtractMonomialRelations();
+                if (blocked) {
+                    return {
+                        gamma: new Map(),
+                        warnings,
+                        relationCount: 0,
+                        blocked: true,
+                    };
+                }
+
+                const model = ambiguityBuildQuiverModel();
+
+                const gamma = new Map();
+                // Gamma[-1]: trivial paths at vertices. The display piece is
+                // the vertex ID; the underlying arrow word is empty.
+                gamma.set(
+                    -1,
+                    model.vertices.map((v) => ({
+                        path: [],
+                        display: v,
+                        pieces: [v],
+                    })),
+                );
+                // Gamma[0]: arrows, each stored as a one-piece path.
+                gamma.set(
+                    0,
+                    model.arrows.map((arrow) => ({
+                        path: [arrow.id],
+                        display: arrow.id,
+                        pieces: [[arrow.id]],
+                    })),
+                );
+                // Gamma[1]: minimal monomial relations, split as
+                // prefix-of-relation | final-arrow.
+                gamma.set(
+                    1,
+                    relations.map((path) => {
+                        const pieces = ambiguityRelationToPieces(path);
+                        return {
+                            path,
+                            display: ambiguityDecompositionKey(pieces),
+                            pieces,
+                        };
+                    }),
+                );
+
+                for (let n = 2; n <= maxN; n++) {
+                    // Gamma[n] is built only from Gamma[n - 1] by relation
+                    // overlap. We do not enumerate arbitrary admissible paths.
+                    const previous = gamma.get(n - 1) || [];
+                    const next = [];
+                    const seen = new Set();
+                    for (const amb of previous) {
+                        for (const relation of relations) {
+                            // Try every proper suffix/prefix overlap between
+                            // the current underlying path and this relation.
+                            for (const extension of ambiguityExtendPiecesByRelation(
+                                amb,
+                                relation,
+                            )) {
+                                // The same underlying path may be found through
+                                // more than one relation/overlap; keep one
+                                // displayed decomposition for the POC output.
+                                const key = ambiguityPathKey(extension.path);
+                                if (seen.has(key)) continue;
+                                seen.add(key);
+                                next.push({
+                                    path: extension.path,
+                                    display: ambiguityDecompositionKey(
+                                        extension.pieces,
+                                    ),
+                                    pieces: extension.pieces,
+                                });
+                            }
+                        }
+                    }
+                    gamma.set(n, next);
+                }
+                return {
+                    gamma,
+                    warnings,
+                    relationCount: relations.length,
+                    blocked: false,
+                };
+            }
+
+            function ambiguityRenderResults(result, maxN) {
+                const lines = [];
+                for (const warning of result.warnings) {
+                    lines.push(
+                        `<span class="ambiguityWarning">${warning}</span>`,
+                    );
+                }
+                if (result.blocked) {
+                    lines.push("");
+                    lines.push("No ambiguity computation was run.");
+                    document.getElementById("ambiguityInfo").innerHTML =
+                        lines.join("\n");
+                    return;
+                }
+                lines.push(
+                    `Minimal monomial relations: ${result.relationCount}`,
+                );
+                for (let n = -1; n <= maxN; n++) {
+                    const values = result.gamma.get(n) || [];
+                    lines.push("");
+                    lines.push(`Gamma[${n}] (${values.length})`);
+                    if (values.length === 0) {
+                        lines.push("  (empty)");
+                    } else {
+                        values.forEach((amb, i) => {
+                            lines.push(
+                                `  ${i + 1}. ${ambiguityDecompositionKey(
+                                    amb.pieces,
+                                )}`,
+                            );
+                        });
+                    }
+                }
+                document.getElementById("ambiguityInfo").innerHTML =
+                    lines.join("\n");
+            }
+
+            function runAmbiguityComputation() {
+                const input = document.getElementById("ambiguityNInput");
+                let maxN = parseInt(input.value, 10);
+                if (!Number.isInteger(maxN)) maxN = 1;
+                maxN = Math.max(1, Math.min(10, maxN));
+                input.value = maxN;
+                try {
+                    ambiguityRenderResults(ambiguityComputeUpTo(maxN), maxN);
+                } catch (error) {
+                    document.getElementById("ambiguityInfo").innerHTML =
+                        `<span class="ambiguityWarning">${error.message}</span>`;
+                }
+            }
+
+            document.addEventListener("DOMContentLoaded", () => {
+                const btn = document.getElementById("computeAmbiguitiesBtn");
+                if (btn) {
+                    btn.addEventListener("click", runAmbiguityComputation);
+                }
+            });
+        </script>
+    </body>
+</html>

@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="980" viewBox="0 0 1440 980" role="img" aria-labelledby="title desc">
+  <title id="title">Single-output QPA to Cytoscape translator interface mockup</title>
+  <desc id="desc">A revised desktop mockup with one unified output panel, relation editing contained in the relation panel, a compact info panel, and a large Cytoscape canvas.</desc>
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#0f172a" flood-opacity="0.13"/>
+    </filter>
+    <style>
+      .bg { fill: #edf3f7; }
+      .header { fill: #132034; }
+      .panel { fill: #ffffff; stroke: #cbd9e6; stroke-width: 1.2; }
+      .soft { fill: #f6f9fc; stroke: #cbd9e6; stroke-width: 1.2; }
+      .canvas { fill: #eef6fb; stroke: #bfd0de; stroke-width: 1.4; }
+      .button { fill: #edf4fb; stroke: #c8d8e6; stroke-width: 1.1; }
+      .button-primary { fill: #2764e7; stroke: #1f52c7; stroke-width: 1.1; }
+      .button-teal { fill: #0f766e; stroke: #0b5f59; stroke-width: 1.1; }
+      .button-warn { fill: #fff7ed; stroke: #fdba74; stroke-width: 1.1; }
+      .badge-ok { fill: #dff8ed; stroke: #7acaa4; stroke-width: 1; }
+      .badge-warn { fill: #fff7ed; stroke: #fdba74; stroke-width: 1; }
+      .row { fill: #ffffff; stroke: #ccd9e5; stroke-width: 1.1; }
+      .row-selected { fill: #e8f1ff; stroke: #2563eb; stroke-width: 1.4; }
+      .tab { fill: #eef4fb; stroke: #cbd9e6; stroke-width: 1; }
+      .tab-active { fill: #2764e7; stroke: #1f52c7; stroke-width: 1; }
+      .ink { fill: #1d2a3a; font: 700 15px "Segoe UI", Arial, sans-serif; }
+      .title { fill: #1b2738; font: 800 16px "Segoe UI", Arial, sans-serif; }
+      .h1 { fill: #ffffff; font: 800 26px "Segoe UI", Arial, sans-serif; }
+      .sub { fill: #c9d6e4; font: 400 13px "Segoe UI", Arial, sans-serif; }
+      .small { fill: #617083; font: 400 12px "Segoe UI", Arial, sans-serif; }
+      .mono { fill: #253246; font: 13px Consolas, "Liberation Mono", monospace; }
+      .mono-muted { fill: #64748b; font: 12px Consolas, "Liberation Mono", monospace; }
+      .white { fill: #ffffff; font: 800 13px "Segoe UI", Arial, sans-serif; }
+      .btntext { fill: #172033; font: 750 12px "Segoe UI", Arial, sans-serif; }
+      .edge { fill: none; stroke: #334155; stroke-width: 3; }
+      .edge-active { fill: none; stroke: #0f766e; stroke-width: 5; stroke-linecap: round; }
+      .edge-next { fill: none; stroke: #f59e0b; stroke-width: 5; stroke-linecap: round; stroke-dasharray: 16 10; }
+      .node { fill: #ffffff; stroke: #2563eb; stroke-width: 3; }
+      .node-active { fill: #eff6ff; stroke: #0f766e; stroke-width: 4; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1440" height="980"/>
+
+  <rect class="header" x="30" y="24" width="1380" height="82" rx="12"/>
+  <text class="h1" x="58" y="63">QPA ↔ Cytoscape Quiver Translator</text>
+  <text class="sub" x="58" y="88">Translator first; optional monomial computations stay inside the single Output panel</text>
+  <rect class="button" x="1206" y="47" width="88" height="34" rx="7"/>
+  <text class="btntext" x="1229" y="69">Theme</text>
+  <rect class="button-primary" x="1308" y="47" width="72" height="34" rx="7"/>
+  <text class="white" x="1333" y="69">Run</text>
+
+  <rect class="panel" x="30" y="122" width="1380" height="52" rx="9"/>
+  <text class="title" x="56" y="154">Advanced text input / import</text>
+  <text class="small" x="244" y="154">folded by default; QPA text remains available but does not dominate the workflow</text>
+  <text class="ink" x="1366" y="156">⌄</text>
+
+  <rect class="panel" x="30" y="194" width="1380" height="744" rx="13" filter="url(#shadow)"/>
+  <text class="title" x="56" y="227">Translator workbench</text>
+
+  <rect class="soft" x="56" y="246" width="850" height="230" rx="10"/>
+  <text class="title" x="78" y="274">Controls</text>
+  <text class="small" x="148" y="274">editing and translator actions stay visible; infrequent tools are folded</text>
+
+  <rect class="panel" x="78" y="294" width="254" height="156" rx="8"/>
+  <text class="title" x="98" y="323">Edit quiver</text>
+  <text class="small" x="187" y="323">always open</text>
+  <rect class="button-primary" x="98" y="342" width="94" height="30" rx="7"/>
+  <text class="white" x="120" y="362">Add vertex</text>
+  <rect class="button-primary" x="202" y="342" width="94" height="30" rx="7"/>
+  <text class="white" x="226" y="362">Add arrow</text>
+  <rect class="button" x="98" y="382" width="94" height="30" rx="7"/>
+  <text class="btntext" x="127" y="402">Rename</text>
+  <rect class="button-warn" x="202" y="382" width="94" height="30" rx="7"/>
+  <text class="btntext" x="234" y="402">Delete</text>
+  <text class="small" x="98" y="435">Selected object status appears in Info.</text>
+
+  <rect class="panel" x="350" y="294" width="254" height="156" rx="8"/>
+  <text class="title" x="370" y="323">Translator</text>
+  <rect class="button-primary" x="370" y="342" width="178" height="31" rx="7"/>
+  <text class="white" x="404" y="363">QPA → Cytoscape</text>
+  <rect class="button-primary" x="370" y="382" width="178" height="31" rx="7"/>
+  <text class="white" x="405" y="403">Cytoscape → QPA</text>
+  <rect class="badge-ok" x="370" y="424" width="104" height="24" rx="12"/>
+  <text class="small" x="397" y="441">Graph valid</text>
+
+  <rect class="panel" x="622" y="294" width="254" height="156" rx="8"/>
+  <text class="title" x="642" y="323">Utilities</text>
+  <rect class="button" x="642" y="342" width="98" height="30" rx="7"/>
+  <text class="btntext" x="674" y="362">Fit</text>
+  <rect class="button" x="750" y="342" width="98" height="30" rx="7"/>
+  <text class="btntext" x="775" y="362">Wriggle</text>
+  <rect class="button" x="642" y="382" width="98" height="30" rx="7"/>
+  <text class="btntext" x="668" y="402">Save</text>
+  <rect class="button" x="750" y="382" width="98" height="30" rx="7"/>
+  <text class="btntext" x="775" y="402">Export</text>
+  <text class="small" x="642" y="435">Bend arrows and display options fold here.</text>
+
+  <rect class="panel" x="928" y="246" width="456" height="444" rx="10"/>
+  <text class="title" x="950" y="274">Output</text>
+  <text class="small" x="1010" y="274">one unified area for output, compute controls, details, warnings, and export</text>
+  <rect class="tab-active" x="950" y="296" width="78" height="30" rx="7"/>
+  <text class="white" x="976" y="316">QPA</text>
+  <rect class="tab" x="1036" y="296" width="112" height="30" rx="7"/>
+  <text class="btntext" x="1064" y="316">Ambiguities</text>
+  <rect class="tab" x="1156" y="296" width="86" height="30" rx="7"/>
+  <text class="btntext" x="1179" y="316">Bardzell</text>
+  <rect class="tab" x="1250" y="296" width="56" height="30" rx="7"/>
+  <text class="btntext" x="1269" y="316">HH</text>
+  <rect class="tab" x="1314" y="296" width="46" height="30" rx="7"/>
+  <text class="btntext" x="1325" y="316">Cup</text>
+
+  <text class="small" x="950" y="354">Optional computations</text>
+  <text class="mono-muted" x="950" y="388">N</text>
+  <rect class="button" x="974" y="366" width="42" height="29" rx="7"/>
+  <text class="mono" x="991" y="386">3</text>
+  <rect class="button-teal" x="1024" y="366" width="132" height="29" rx="7"/>
+  <text class="white" x="1052" y="386">Compute n-ambiguities</text>
+  <rect class="button" x="1166" y="366" width="86" height="29" rx="7"/>
+  <text class="btntext" x="1189" y="386">Bardzell</text>
+  <rect class="button" x="1262" y="366" width="48" height="29" rx="7"/>
+  <text class="btntext" x="1278" y="386">HH</text>
+  <rect class="button" x="1320" y="366" width="40" height="29" rx="7"/>
+  <text class="btntext" x="1331" y="386">Cup</text>
+
+  <rect class="row-selected" x="950" y="414" width="394" height="43" rx="7"/>
+  <text class="mono" x="968" y="441">Γ[2]  a*b | c*d | a</text>
+  <rect class="row" x="950" y="468" width="394" height="43" rx="7"/>
+  <text class="mono" x="968" y="495">Γ[2]  c*d | a*b | c</text>
+  <rect class="row" x="950" y="522" width="394" height="43" rx="7"/>
+  <text class="mono" x="968" y="549">Γ[3]  a*b | c*d | a*b | c</text>
+  <rect class="row" x="950" y="584" width="394" height="64" rx="7"/>
+  <text class="small" x="968" y="609">Expanded details stay here, not in a second output panel.</text>
+  <text class="mono-muted" x="968" y="632">Clicking a row selects it, updates Info, and animates the canvas.</text>
+
+  <rect class="button" x="950" y="660" width="72" height="30" rx="7"/>
+  <text class="btntext" x="973" y="680">Copy</text>
+  <rect class="button" x="1030" y="660" width="72" height="30" rx="7"/>
+  <text class="btntext" x="1052" y="680">Clear</text>
+  <rect class="button" x="1110" y="660" width="78" height="30" rx="7"/>
+  <text class="btntext" x="1132" y="680">Export</text>
+
+  <rect class="panel" x="928" y="712" width="456" height="188" rx="10"/>
+  <text class="title" x="950" y="742">Info</text>
+  <rect class="badge-warn" x="1284" y="724" width="78" height="24" rx="12"/>
+  <text class="small" x="1301" y="741">Stale</text>
+  <text class="small" x="950" y="770">Warnings, graph status, and selected-row details only.</text>
+  <text class="mono" x="950" y="804">Selected ambiguity: Γ[2]</text>
+  <text class="mono" x="950" y="830">Pieces: a*b | c*d | a</text>
+  <text class="mono" x="950" y="856">Underlying path: a*b*c*d*a</text>
+  <text class="mono-muted" x="950" y="882">If a relation is non-monomial, Compute ambiguities stops here.</text>
+
+  <rect class="panel" x="56" y="520" width="260" height="380" rx="10"/>
+  <text class="title" x="78" y="550">Relations</text>
+  <text class="small" x="78" y="574">display, selection, and editing stay in this panel</text>
+  <rect class="button-teal" x="78" y="598" width="110" height="30" rx="7"/>
+  <text class="white" x="101" y="618">New relation</text>
+  <rect class="button" x="198" y="598" width="82" height="30" rx="7"/>
+  <text class="btntext" x="224" y="618">Undo</text>
+  <rect class="button" x="78" y="638" width="82" height="30" rx="7"/>
+  <text class="btntext" x="105" y="658">Edit</text>
+  <rect class="button-warn" x="170" y="638" width="82" height="30" rx="7"/>
+  <text class="btntext" x="192" y="658">Remove</text>
+  <rect class="row-selected" x="78" y="692" width="210" height="43" rx="7"/>
+  <text class="mono" x="98" y="719">r1: a*b*c</text>
+  <rect class="row" x="78" y="748" width="210" height="43" rx="7"/>
+  <text class="mono" x="98" y="775">r2: c*d*a</text>
+  <rect class="soft" x="78" y="816" width="210" height="54" rx="7"/>
+  <text class="mono-muted" x="96" y="839">building: a*b</text>
+  <text class="small" x="96" y="858">next arrows restricted by target</text>
+
+  <rect class="canvas" x="338" y="520" width="590" height="380" rx="10"/>
+  <text class="title" x="362" y="550">Cytoscape canvas</text>
+  <text class="small" x="510" y="550">selected relation or ambiguity pieces animate here</text>
+
+  <path class="edge-active" d="M505 674 C570 585 685 585 754 674"/>
+  <path class="edge-next" d="M754 674 C825 760 677 805 565 732"/>
+  <path class="edge" d="M505 674 C445 745 462 797 565 732"/>
+  <path class="edge" d="M565 732 C626 786 720 765 754 674"/>
+  <circle class="node-active" cx="505" cy="674" r="28"/>
+  <circle class="node" cx="754" cy="674" r="28"/>
+  <circle class="node" cx="565" cy="732" r="28"/>
+  <text class="ink" x="495" y="680">v1</text>
+  <text class="ink" x="744" y="680">v2</text>
+  <text class="ink" x="555" y="738">v3</text>
+  <text class="mono" x="586" y="612">piece 1 flows, then piece 2, then piece 3; no loop</text>
+</svg>
