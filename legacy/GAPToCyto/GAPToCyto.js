@@ -11,6 +11,7 @@ let addRelationMode = false;
 let autoNameVertexCounter = 0;
 let autoNameArrowCounter = 1;
 let animationTimer = null;
+let activePathOrientation = "L2R";
 
 function infLetters(i) {
     // i=0,...,51 gives alphabet, othersie alphabet-with-hat
@@ -133,6 +134,24 @@ function termsToRelation(terms, joinStr = "·") {
             const scalar = `${t.scalar}`;
             const sign = scalar.startsWith("-") || i === 0 ? "" : "+";
             return `${sign}${scalar}${joinToken}${monomial}`;
+        })
+        .join("");
+}
+
+function monomialDisplay(monomial, orientation) {
+    const arrows = orientation === "R2L" ? [...monomial].reverse() : monomial;
+    return arrows.join("·");
+}
+
+function termsToDisplayRelation(terms, orientation = activePathOrientation) {
+    return terms
+        .map((t, i) => {
+            const monomial = monomialDisplay(t.monomial, orientation);
+            if (t.scalar === "") return `${i === 0 ? "" : "+"}${monomial}`;
+            if (t.scalar === "-") return `-${monomial}`;
+            const scalar = `${t.scalar}`;
+            const sign = scalar.startsWith("-") || i === 0 ? "" : "+";
+            return `${sign}${scalar}·${monomial}`;
         })
         .join("");
 }
@@ -567,7 +586,7 @@ function translateQPA() {
 function refreshRelationsOutput(relations) {
     addRelationMode = false;
     let outputDiv = document.getElementById("relOutput");
-    outputDiv.innerHTML = `Relations:<br>`;
+    outputDiv.innerHTML = "";
     outputDiv.classList.remove("add-relation-mode");
     outputDiv.contentEditable = "false";
     selectedRelationIndex = -1;
@@ -577,7 +596,10 @@ function refreshRelationsOutput(relations) {
         divElt.classList.add("relationRow");
         divElt.contentEditable = "false";
         divElt.setAttribute("id", relations[i].reln);
-        divElt.innerHTML = relations[i].reln;
+        divElt.innerHTML = termsToDisplayRelation(
+            relations[i].terms,
+            activePathOrientation,
+        );
         divElt.addEventListener("click", () => {
             selectNthRelation(i);
         });
@@ -585,6 +607,45 @@ function refreshRelationsOutput(relations) {
     }
     document.getElementById("btnAddReln").value = "Add relation(s)";
 }
+
+function applyPathOrientationLabel() {
+    document.querySelectorAll("[data-orientation]").forEach((button) => {
+        button.setAttribute(
+            "aria-pressed",
+            button.dataset.orientation === activePathOrientation
+                ? "true"
+                : "false",
+        );
+    });
+}
+
+function setPathOrientation(orientation) {
+    if (orientation !== "L2R" && orientation !== "R2L") return;
+    if (orientation === activePathOrientation) {
+        applyPathOrientationLabel();
+        return;
+    }
+
+    const relationToSelect = selectedRelationIndex;
+    activePathOrientation = orientation;
+    applyPathOrientationLabel();
+
+    if (Relations) {
+        refreshRelationsOutput(Relations);
+        if (
+            cy &&
+            relationToSelect >= 0 &&
+            relationToSelect < Relations.length
+        ) {
+            selectNthRelation(relationToSelect);
+        }
+    }
+}
+
+window.GAPCytoEx = {
+    ...(window.GAPCytoEx || {}),
+    setPathOrientation,
+};
 
 function presentData(quiver, relations, isPreset = false) {
     refreshRelationsOutput(relations);

@@ -23,6 +23,12 @@ It should replace or simplify:
 
 Use the current updated frontend layout as the baseline. The goal is to evolve it, not replace it with a different app shell.
 
+Current Stage 1 decisions:
+
+- The separate persistent `InfoPanel`/info box is not part of the current accepted UI. Status and validation messages should remain compact and scoped to the single output/workbench area unless a later stage explicitly reintroduces an info region.
+- Relation rows in the legacy UI continue to use the existing `terms` shape. The `R2L` convention is display-only for now: reverse the displayed arrow word order, but do not change relation storage, graph arrows, QPA import, or QPA export.
+- The graphical relation-builder workflow is deferred to a stretch goal and is not required for Stage 1 completion.
+
 - top bar with app title, light/dark theme switch, save/load/export actions, and status;
 - an `Advanced text input` accordion for QPA/text import/export and debugging;
 - an output/workbench panel containing graph editing controls, relation tools, the single `OutputPanel`, and the Cytoscape canvas;

@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-svg@0.4.0/cytoscape-svg.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <script src="../legacy/GAPToCyto/GAPToCyto.js" defer></script>
-    <script type="module" src="./assets/app.js"></script>
+    <script src="./assets/app.js" defer></script>
   </head>
 
   <body>
@@ -23,7 +23,7 @@
         </div>
         <div class="header-actions">
           <div class="global-orientation" aria-label="Path display convention">
-            <span id="relation-orientation">Path orientation:</span>
+            <span id="relation-orientation">Path orientation</span>
             <div class="segmented">
               <button type="button" data-orientation="L2R" aria-pressed="true">Left-to-right</button>
               <button type="button" data-orientation="R2L" aria-pressed="false">Right-to-left</button>
@@ -183,7 +183,6 @@
               </div>
             </div>
             <div id="outTxtBox"></div>
-            <aside id="info-panel" class="info-panel" aria-label="Info panel"></aside>
           </section>
 
           <section class="canvas-row" aria-label="Canvas and relations">
@@ -198,7 +197,7 @@
                 <input type="button" id="btnEditReln" value="Edit relation" />
                 <input type="button" id="btnUnselectRelns" value="Unselect all" />
               </div>
-              <div id="relOutput" contenteditable="false">Relations:</div>
+              <div id="relOutput" contenteditable="false"></div>
             </aside>
 
             <div class="relation-canvas-splitter" data-resize-splitter="relations" role="separator" aria-label="Resize relation panel" tabindex="0"></div>
@@ -262,6 +261,5 @@
         </div>
       </details>
     </main>
-    <script src="./splitters.js"></script>
   </body>
 </html>

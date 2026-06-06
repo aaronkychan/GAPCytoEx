@@ -1,5 +1,23 @@
+import { fileURLToPath } from "node:url";
+
 const root = new URL("../public/", import.meta.url);
 const legacyRoot = new URL("../legacy/", import.meta.url);
+const appEntry = new URL("../src/frontend/app.ts", import.meta.url);
+const assetsRoot = new URL("../public/assets/", import.meta.url);
+
+const appBuild = await Bun.build({
+  entrypoints: [fileURLToPath(appEntry)],
+  outdir: fileURLToPath(assetsRoot),
+  target: "browser",
+  sourcemap: "external"
+});
+
+if (!appBuild.success) {
+  for (const log of appBuild.logs) {
+    console.error(log);
+  }
+  throw new Error("Failed to build frontend bundle.");
+}
 
 const mimeTypes: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
