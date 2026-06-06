@@ -1,4 +1,5 @@
 const root = new URL("../public/", import.meta.url);
+const legacyRoot = new URL("../legacy/", import.meta.url);
 
 const mimeTypes: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
@@ -18,7 +19,8 @@ Bun.serve({
   async fetch(request) {
     const url = new URL(request.url);
     const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
-    const fileUrl = new URL(`.${pathname}`, root);
+    const isLegacy = pathname.startsWith("/legacy/");
+    const fileUrl = isLegacy ? new URL(`.${pathname.slice("/legacy".length)}`, legacyRoot) : new URL(`.${pathname}`, root);
     const file = Bun.file(fileUrl);
     if (!(await file.exists())) {
       return new Response("Not found", { status: 404 });

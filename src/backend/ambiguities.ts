@@ -1,4 +1,5 @@
 import type { Path, PathOrientation } from "./paths";
+import { reverseOrientation } from "./path-orientation";
 
 export type AmbiguityKind = "left" | "right";
 
@@ -47,14 +48,8 @@ export function underlyingPathOfAmbiguity(ambiguity: Ambiguity): Path {
 export function reverseOrientationOfAmbiguity(ambiguity: Ambiguity): Ambiguity {
   return {
     n: ambiguity.n,
-    pieces: ambiguity.pieces
-      .map((piece) => ({
-        ...piece,
-        arrows: [...piece.arrows].reverse(),
-        orientation: piece.orientation === "L2R" ? "R2L" : "L2R"
-      }))
-      .reverse(),
-    orientation: ambiguity.orientation === "L2R" ? "R2L" : "L2R",
+    pieces: ambiguity.pieces.map((piece) => reverseOrientation(piece)).reverse(),
+    orientation: reverseOrientation(underlyingPathOfAmbiguity(ambiguity)).orientation,
     kind: ambiguity.kind === "left" ? "right" : "left"
   };
 }
