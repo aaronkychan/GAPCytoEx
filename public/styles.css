@@ -999,6 +999,43 @@ input[type="button"]:hover:not(:disabled) {
   padding: 0.65rem 0.75rem;
 }
 
+.relation-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--border);
+}
+
+.relation-tabs[hidden] {
+  display: none;
+}
+
+.relation-tabs button {
+  min-height: 32px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--surface-muted);
+}
+
+.relation-tabs button:last-child {
+  border-right: 0;
+}
+
+.relation-tabs button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--accent-strong);
+}
+
+.relation-tab-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.relation-tab-panel[hidden] {
+  display: none;
+}
+
 #relOutput {
   min-height: 0;
   height: 100%;
@@ -1008,6 +1045,48 @@ input[type="button"]:hover:not(:disabled) {
   resize: none;
   background: var(--surface);
   overflow: auto;
+}
+
+#ambiguityOutput {
+  min-height: 0;
+  height: 100%;
+  min-width: 0;
+  border: 0;
+  background: var(--surface);
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 0.92rem;
+}
+
+.ambiguity-degree {
+  padding: 0.5rem 0.65rem 0.2rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.ambiguity-divider {
+  margin: 0.35rem 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.ambiguityRow {
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  padding: 0.28rem 0.45rem;
+}
+
+.ambiguityRow.row-even {
+  color: var(--relation-color-secondary);
+}
+
+.ambiguityRow.row-odd {
+  color: var(--relation-color-primary);
+}
+
+.ambiguityRow:hover {
+  background: var(--surface-strong);
 }
 
 .canvas-panel {

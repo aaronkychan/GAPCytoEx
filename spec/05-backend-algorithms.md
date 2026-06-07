@@ -2,7 +2,7 @@
 
 ### 0. Align Path Orientation
 
-Before ambiguity, Bardzell, cohomology, or cup-product computation, align the path orientation data.
+Before ambiguity, Hochschild cochain-complex, cohomology, or cup-product computation, align the path orientation data.
 
 Rules:
 
@@ -149,45 +149,44 @@ The POC implementation must keep comments attached to these steps in the ambigui
 
 The implementation must include focused tests for non-quadratic examples where ambiguity pieces are longer than one arrow.
 
-### 4. Build Bardzell Chain Complex
+### 4. Build Hochschild Cochain Complex
 
-Build the Bardzell resolution as a chain complex, following the paper's indexing convention as closely as possible. The resolution is a virtually infinite object whose individual degrees are finite-dimensional vector spaces over a field.
+Build the Hochschild cochain complex used to compute Hochschild cohomology. Do not implement or expose a standalone Bardzell chain complex as the user-facing stage. Bardzell's resolution appears here only through the notation `Bzl_{n+1}(A)` in the term
 
-The `BardzellComplex` object contains:
+```text
+C^n = Hom_{A^e}(Bzl_{n+1}(A), A) \cong \Bbbk \Gamma_n || \mathcal{B}.
+```
 
-- `terms.getAt(k)`: the chain term in degree `k`;
-- `differentials.getAt(k)`: the chain differential in degree `k`;
+The complex is a virtually infinite object whose individual cochain degrees are finite-dimensional vector spaces over the selected field.
+
+The `HochschildCochainComplex` object contains:
+
+- `terms.getAt(n)`: the cochain term `C^n` in degree `n`;
+- `coboundaries.getAt(n)`: the cochain coboundary `d^n : C^n -> C^{n + 1}`;
 - `getArray(start, endInclusive)` helpers on both sequences for UI display, testing, and finite exports.
 
 Indexing convention:
 
-- Use chain-complex convention.
-- `terms.getAt(k)` is defined only for non-negative integers `k >= 0`.
-- Calling `terms.getAt(k)` with `k < 0` is an error; no Bardzell implementation should need it.
-- The `(n + 1)`-st chain term is built from `n`-ambiguities.
-- Equivalently, `terms.getAt(n + 1)` uses `Gamma[n]`.
-- In particular:
-  - `terms.getAt(0)` is the degree-zero algebra term of the resolution;
-  - `terms.getAt(1)` uses `Gamma[0]`;
-  - `terms.getAt(2)` uses `Gamma[1]`;
-  - `terms.getAt(k)` uses `Gamma[k - 1]` for `k >= 1`.
-- `differentials.getAt(k)` is the chain map `d_k : terms[k] -> terms[k - 1]`.
-- `differentials.getAt(k)` is defined for `k >= 1`.
-- Calling `differentials.getAt(k)` with `k < 0` is an error.
-- If a caller asks for `differentials.getAt(0)`, the implementation may return the zero map `d_0` without calling `terms.getAt(-1)`, or may reject it as outside the public differential range. It must never request a negative Bardzell term internally.
+- Use cochain-complex convention.
+- `terms.getAt(n)` is defined only for non-negative integers `n >= 0`.
+- Calling `terms.getAt(n)` with `n < 0` is an error; no Hochschild cochain implementation should need it.
+- `terms.getAt(n)` uses `Gamma[n]` and admissible basis paths.
+- `coboundaries.getAt(n)` is the cochain map `d^n : terms[n] -> terms[n + 1]`.
+- `coboundaries.getAt(n)` is defined for `n >= 0`.
+- Calling `coboundaries.getAt(n)` with `n < 0` is an error.
 
-For a chain degree `k >= 1`, basis elements are pairs:
+For a cochain degree `n >= 0`, basis elements are pairs:
 
 ```ts
-interface ChainBasisElement {
-  ambiguity: Ambiguity; // p in Gamma[k - 1]
+interface CochainBasisElement {
+  ambiguity: Ambiguity; // p in Gamma[n]
   basisPath: Path;      // b in B
 }
 ```
 
 where `underlyingPathOfAmbiguity(ambiguity)` and `basisPath` have the same source and target.
 
-Represent differentials as sparse matrices:
+Represent coboundaries as sparse matrices:
 
 ```ts
 interface SparseMatrix {
@@ -197,7 +196,7 @@ interface SparseMatrix {
 }
 ```
 
-Use the paper's Bardzell differential formulas with the chain indexing above and the explicit `R2L`/`L2R` path-orientation rules from the ambiguity stage.
+Use the paper's Hochschild coboundary formulas with the cochain indexing above and the explicit `R2L`/`L2R` path-orientation rules from the ambiguity stage.
 
 Field support for v1:
 
@@ -208,7 +207,7 @@ The spec needs one field implementation chosen before coding.
 
 ### 5. Compute Cohomology
 
-Hochschild cohomology is virtual degreewise data, implemented only after the Bardzell chain-complex stage has been human-checked. `computeHochschildCohomology(input)` returns an object whose `groups.getAt(d)` computes `HH^d` only when requested, using the cached Bardzell resolution data needed in that degree.
+Hochschild cohomology is virtual degreewise data, implemented only after the Hochschild cochain-complex stage has been human-checked. `computeHochschildCohomology(input)` returns an object whose `groups.getAt(d)` computes `HH^d` only when requested, using the cached cochain data needed in that degree.
 
 Compute:
 
@@ -222,7 +221,7 @@ Use TypeScript linear algebra over the selected field:
 - expose kernel bases, image bases, quotient representatives, and coordinate maps;
 - retain `p || b` metadata so results remain readable.
 
-To compute `HH^d`, the backend must compute enough of the Bardzell resolution, apply the appropriate Hom construction, and then compute the degreewise kernel/image quotient. To get the array of `HH^0` through `HH^N`, it is acceptable and expected that the lazy backend computes Bardzell chain data through the degrees needed by the Hom complex.
+To compute `HH^d`, the backend must compute enough Hochschild cochain terms and coboundaries to form the degreewise kernel/image quotient. To get the array of `HH^0` through `HH^N`, it is acceptable and expected that the lazy backend computes cochain data through the needed degrees.
 
 ### 6. Compute Cup Product
 

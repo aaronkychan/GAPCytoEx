@@ -1,8 +1,15 @@
 import type { RelationData } from "../backend/relations";
 import type { CytoscapeElementData } from "../backend/qpa-translator";
 import type { PathOrientation } from "../backend/paths";
+import type { Ambiguity } from "../backend/ambiguities";
 
 export type EditMode = "default" | "add" | "rename" | "delete";
+export type RelationPanelTab = "relations" | "ambiguities";
+
+export interface AmbiguityDegreeGroup {
+  degree: number;
+  ambiguities: Ambiguity[];
+}
 
 export interface WorkbenchState {
   quiverData: { nodes: CytoscapeElementData[]; edges: CytoscapeElementData[] } | null;
@@ -18,6 +25,9 @@ export interface WorkbenchState {
   animationTimer: ReturnType<typeof setInterval> | null;
   activePathOrientation: PathOrientation;
   activeFieldCharacteristic: number;
+  ambiguityGroupsByOrientation: Record<PathOrientation, AmbiguityDegreeGroup[]> | null;
+  selectedAmbiguityId: string | null;
+  relationPanelTab: RelationPanelTab;
 }
 
 export function createWorkbenchState(): WorkbenchState {
@@ -34,6 +44,9 @@ export function createWorkbenchState(): WorkbenchState {
     autoNameArrowCounter: 1,
     animationTimer: null,
     activePathOrientation: "L2R",
-    activeFieldCharacteristic: 0
+    activeFieldCharacteristic: 0,
+    ambiguityGroupsByOrientation: null,
+    selectedAmbiguityId: null,
+    relationPanelTab: "relations"
   };
 }

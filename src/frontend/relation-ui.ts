@@ -1,4 +1,6 @@
 import type { RelationData } from "../backend/relations";
+import type { Ambiguity } from "../backend/ambiguities";
+import type { Path } from "../backend/paths";
 import {
   formatRelationData,
   formatRelationDataForInput,
@@ -8,6 +10,114 @@ import { parseRelationEntries, parseSingleRelation, quiverFromCytoscape } from "
 import type { WorkbenchState } from "./workbench-state";
 import { setError } from "./log-panel";
 import { cytoThemeColors, relationHighlightColor } from "./cytoscape-style";
+
+function formatPathWord(arrows: string[]): string {
+  return arrows.join("·");
+}
+
+function formatAmbiguityPiece(piece: Path): string {
+  if (piece.arrows.length === 0) {
+    return `(${piece.target})`;
+  }
+  return formatPathWord(piece.arrows);
+}
+
+export function formatAmbiguityForDisplay(ambiguity: Ambiguity): string {
+  return ambiguity.pieces.map(formatAmbiguityPiece).join(" | ");
+}
+
+function ambiguityRowId(degree: number, index: number): string {
+  return `ambiguity-${degree}-${index}`;
+}
+
+export function setRelationPanelTab(state: WorkbenchState, tab: "relations" | "ambiguities"): void {
+  if (tab === "ambiguities" && !state.ambiguityGroupsByOrientation) {
+    tab = "relations";
+  }
+  state.relationPanelTab = tab;
+  document.querySelectorAll<HTMLButtonElement>("[data-relation-panel-tab]").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.relationPanelTab === tab ? "true" : "false");
+  });
+
+  const relationPanel = document.getElementById("relationsTabPanel");
+  const ambiguityPanel = document.getElementById("ambiguitiesTabPanel");
+  if (relationPanel) {
+    relationPanel.hidden = tab !== "relations";
+  }
+  if (ambiguityPanel) {
+    ambiguityPanel.hidden = tab !== "ambiguities";
+  }
+}
+
+function refreshRelationPanelTabs(state: WorkbenchState): void {
+  const tabs = document.getElementById("relationPanelTabs");
+  if (!tabs) {
+    return;
+  }
+  const hasAmbiguities = state.ambiguityGroupsByOrientation !== null;
+  tabs.hidden = !hasAmbiguities;
+  setRelationPanelTab(state, hasAmbiguities ? state.relationPanelTab : "relations");
+}
+
+export function refreshAmbiguitiesOutput(state: WorkbenchState): void {
+  refreshRelationPanelTabs(state);
+  const output = document.getElementById("ambiguityOutput");
+  if (!output) {
+    return;
+  }
+  output.innerHTML = "";
+  state.selectedAmbiguityId = null;
+  const groups = state.ambiguityGroupsByOrientation?.[state.activePathOrientation];
+  if (!groups) {
+    return;
+  }
+
+  let rowIndex = 0;
+  for (const [groupIndex, group] of groups.entries()) {
+    if (groupIndex > 0) {
+      output.appendChild(document.createElement("hr")).className = "ambiguity-divider";
+    }
+    const heading = document.createElement("div");
+    heading.className = "ambiguity-degree";
+    heading.textContent = `Gamma[${group.degree}] (${group.ambiguities.length})`;
+    output.appendChild(heading);
+
+    if (group.ambiguities.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "ambiguityRow row-even";
+      empty.textContent = "(empty)";
+      output.appendChild(empty);
+      rowIndex += 1;
+      continue;
+    }
+
+    group.ambiguities.forEach((ambiguity, ambiguityIndex) => {
+      const row = document.createElement("div");
+      row.className = `ambiguityRow ${rowIndex % 2 === 0 ? "row-even" : "row-odd"}`;
+      row.dataset.ambiguityId = ambiguityRowId(group.degree, ambiguityIndex);
+      row.textContent = formatAmbiguityForDisplay(ambiguity);
+      row.addEventListener("click", () => selectAmbiguity(state, group.degree, ambiguityIndex));
+      output.appendChild(row);
+      rowIndex += 1;
+    });
+  }
+}
+
+function clearAmbiguityResults(state: WorkbenchState): void {
+  state.ambiguityGroupsByOrientation = null;
+  state.selectedAmbiguityId = null;
+  state.relationPanelTab = "relations";
+  refreshAmbiguitiesOutput(state);
+}
+
+export function selectAmbiguity(state: WorkbenchState, degree: number, index: number): void {
+  state.selectedRelationIndex = -1;
+  state.selectedAmbiguityId = ambiguityRowId(degree, index);
+  clearRelationAnimation(state);
+  document.querySelectorAll("#relOutput .relationRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelector(`#ambiguityOutput [data-ambiguity-id="${state.selectedAmbiguityId}"]`)?.classList.add("selectedRelationRow");
+}
 
 export function validateRelationArrowReferences(relations: RelationData[], cyInstance: any): boolean {
   if (!cyInstance) {
@@ -48,6 +158,7 @@ export function renameArrowInRelations(oldName: string, newName: string, relatio
   }
 
   if (renamed) {
+    clearAmbiguityResults(state);
     validateRelationArrowReferences(relations, cyInstance);
     refreshRelationsOutput(state);
   }
@@ -56,6 +167,7 @@ export function renameArrowInRelations(oldName: string, newName: string, relatio
 
 export function refreshRelationsOutput(state: WorkbenchState): void {
   state.addRelationMode = false;
+  refreshRelationPanelTabs(state);
   const output = document.getElementById("relOutput");
   if (!output) {
     return;
@@ -101,6 +213,7 @@ export function setPathOrientation(state: WorkbenchState, orientation: "L2R" | "
   applyPathOrientationLabel(state);
 
   refreshRelationsOutput(state);
+  refreshAmbiguitiesOutput(state);
   if (state.cy && relationToSelect >= 0 && relationToSelect < state.relations.length) {
     selectRelation(state, relationToSelect);
   }
@@ -116,6 +229,7 @@ export function clearRelationAnimation(state: WorkbenchState): void {
 
 export function selectRelation(state: WorkbenchState, index: number): void {
   state.selectedRelationIndex = index;
+  state.selectedAmbiguityId = null;
   clearRelationAnimation(state);
   if (!state.cy) {
     return;
@@ -135,6 +249,7 @@ export function selectRelation(state: WorkbenchState, index: number): void {
   }
 
   rows.forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
   if (index < 0 || index >= rows.length || index >= state.relations.length) {
     return;
   }
@@ -227,6 +342,7 @@ export function editSelectedRelation(state: WorkbenchState): void {
     });
     state.relations[state.selectedRelationIndex] = relation;
     const relationToSelect = state.selectedRelationIndex;
+    clearAmbiguityResults(state);
     refreshRelationsOutput(state);
     selectRelation(state, relationToSelect);
   } catch (error) {
@@ -283,6 +399,7 @@ export function exitAddRelationMode(state: WorkbenchState, commitChanges = true)
         setError("No valid relation entered.");
       } else {
         state.relations = state.relations.concat(relations);
+        clearAmbiguityResults(state);
       }
     } catch (error) {
       setError((error as Error).message);
@@ -328,5 +445,6 @@ export function removeRelationsUsingArrows(state: WorkbenchState, removedArrows:
     return;
   }
   state.relations = state.relations.filter((relation) => !(relation.terms ?? []).some((term) => term.monomial.some((arrow) => removedArrows.includes(arrow))));
+  clearAmbiguityResults(state);
   refreshRelationsOutput(state);
 }

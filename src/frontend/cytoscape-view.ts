@@ -146,6 +146,9 @@ export function initCytoscape(state: WorkbenchState, inputData: { nodes?: Cytosc
 export function presentData(state: WorkbenchState, quiver: { nodes: CytoscapeElementData[]; edges: CytoscapeElementData[] }, relations: any[], isPreset = false): void {
   state.quiverData = quiver;
   state.relations = relations;
+  state.ambiguityGroupsByOrientation = null;
+  state.selectedAmbiguityId = null;
+  state.relationPanelTab = "relations";
   refreshRelationsOutput(state);
   ["saveSVG", "fixCyto", "wriggle", "toQPABtn"].forEach((id) => {
     const button = document.getElementById(id) as HTMLButtonElement | HTMLInputElement | null;
@@ -213,6 +216,10 @@ export function doubleQuiver(state: WorkbenchState): void {
     });
   }
   if (reverseArrows.length > 0) {
+    state.ambiguityGroupsByOrientation = null;
+    state.selectedAmbiguityId = null;
+    state.relationPanelTab = "relations";
+    refreshRelationsOutput(state);
     state.cy.add(reverseArrows);
     state.cy.layout({ name: "cose", animate: true, animationDuration: 800, randomize: false, nodeDimensionsIncludeLabels: true }).run();
   }
@@ -223,6 +230,9 @@ export function clearAll(state: WorkbenchState): void {
   state.addRelationMode = false;
   state.quiverData = null;
   state.relations = [];
+  state.ambiguityGroupsByOrientation = null;
+  state.selectedAmbiguityId = null;
+  state.relationPanelTab = "relations";
   state.cy = null;
   const quiverInput = document.getElementById("inQuiver") as HTMLTextAreaElement | null;
   const relationInput = document.getElementById("inRelation") as HTMLTextAreaElement | null;

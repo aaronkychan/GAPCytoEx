@@ -88,7 +88,7 @@ function reverseOrientationOfAmbiguity(ambiguity: Ambiguity): Ambiguity;
 function tidyUpMonomialAlgebra(input: MonomialAlgebraInput): VerifiedMonomialAlgebra;
 ```
 
-`reverseOrientation` switches between `L2R` and `R2L` path-word conventions by reversing `path.arrows` and toggling `path.orientation`. It must preserve the mathematical path's `source` and `target`; it does not reverse quiver arrows. `tidyUpMonomialAlgebra` validates relation composability on the stored `L2R` traversal path, keeps `originalRelations`, and stores `minimisedRelations` before any ambiguity, Bardzell, cohomology, or cup-product computation runs. Callers derive `R2L` words with `reverseOrientation` when they need paper-order display or computation.
+`reverseOrientation` switches between `L2R` and `R2L` path-word conventions by reversing `path.arrows` and toggling `path.orientation`. It must preserve the mathematical path's `source` and `target`; it does not reverse quiver arrows. `tidyUpMonomialAlgebra` validates relation composability on the stored `L2R` traversal path, keeps `originalRelations`, and stores `minimisedRelations` before any ambiguity, Hochschild cochain-complex, cohomology, or cup-product computation runs. Callers derive `R2L` words with `reverseOrientation` when they need paper-order display or computation.
 
 `reverseOrientationOfAmbiguity` switches between the equivalent `R2L` left-ambiguity and `L2R` right-ambiguity forms. It must reverse the order of the ambiguity pieces and apply `reverseOrientation` to each nontrivial piece, while preserving the mathematical underlying path.
 
@@ -171,9 +171,9 @@ interface AmbiguityComputation {
   warnings: AmbiguityComparisonWarning[];
 }
 
-interface BardzellComplex {
-  terms: LazySequence<ChainSpace>;
-  differentials: LazySequence<SparseMatrix>;
+interface HochschildCochainComplex {
+  terms: LazySequence<CochainSpace>;
+  coboundaries: LazySequence<SparseMatrix>;
 }
 
 interface HochschildCohomology {
@@ -186,7 +186,7 @@ function computeRightAmbiguitiesL2R(input: VerifiedMonomialAlgebra): AmbiguitySe
 
 function computeAmbiguities(input: MonomialAlgebraInput): AmbiguityComputation;
 
-function buildBardzellComplex(input: MonomialAlgebraInput): BardzellComplex;
+function buildHochschildCochainComplex(input: MonomialAlgebraInput): HochschildCochainComplex;
 
 function computeHochschildCohomology(input: MonomialAlgebraInput): HochschildCohomology;
 
@@ -203,5 +203,5 @@ The core objects are virtually infinite: they compute degree `n` only when `getA
 
 Prefer memoized lazy indexed sequences over plain one-shot generators for the core API. A JavaScript `Generator` or `IterableIterator` may be exposed for streaming via `getIteratorFrom(start)`, but repeated degreewise access must go through cached `getAt(index)`.
 
-The pipeline should reuse intermediate lazy sequences instead of recomputing ambiguities, admissible basis paths, Bardzell term bases, differentials, and homology groups independently.
+The pipeline should reuse intermediate lazy sequences instead of recomputing ambiguities, admissible basis paths, Hochschild cochain term bases, coboundaries, and cohomology groups independently.
 

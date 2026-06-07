@@ -1,12 +1,12 @@
 import {
   computeAmbiguitiesFromVerified,
   getLazySequenceTerms,
-  type Ambiguity
 } from "../backend/ambiguities";
-import type { Path, PathOrientation } from "../backend/paths";
+import type { PathOrientation } from "../backend/paths";
 import { tidyUpRelationDataAlgebra, MonomialAlgebraError } from "../backend/monomial-algebra";
 import type { Quiver } from "../backend/quiver";
 import { appendOutputHtml, setError, setInfoStatus } from "./log-panel";
+import { formatAmbiguityForDisplay, refreshAmbiguitiesOutput, setRelationPanelTab } from "./relation-ui";
 import type { WorkbenchState } from "./workbench-state";
 
 const DEFAULT_COMPUTE_TERM_BOUND = 5;
@@ -54,23 +54,8 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function formatPathWord(arrows: string[]): string {
-  return arrows.join("·");
-}
-
 function formatOrientation(orientation: PathOrientation): string {
   return orientation === "R2L" ? "right-to-left" : "left-to-right";
-}
-
-function formatAmbiguityPiece(piece: Path): string {
-  if (piece.arrows.length === 0) {
-    return `(${piece.target})`;
-  }
-  return formatPathWord(piece.arrows);
-}
-
-function formatAmbiguity(ambiguity: Ambiguity): string {
-  return ambiguity.pieces.map(formatAmbiguityPiece).join(" | ");
 }
 
 export function computeAndRenderAmbiguities(state: WorkbenchState): void {
@@ -114,7 +99,6 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
     console.time(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
     const computation = computeAmbiguitiesFromVerified(verified, maxDegree);
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
-    const sequence = state.activePathOrientation === "R2L" ? computation.primaryLeftR2L : computation.checkRightL2R;
     const lines: string[] = [];
 
     lines.push(`<div><strong>Ambiguities (${formatOrientation(state.activePathOrientation)})</strong></div>`);
@@ -122,14 +106,31 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
       lines.push(`<div class="status-warn">${escapeHtml(warning.message)}</div>`);
     }
     console.time(`${COMPUTATION_LOG_PREFIX} render requested terms`);
-    for (const [degree, ambiguities] of getLazySequenceTerms(sequence, -1, maxDegree, logOnlyLastTerm)) {
+    const ambiguityGroupsR2L = getLazySequenceTerms(computation.primaryLeftR2L, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
+      degree,
+      ambiguities
+    }));
+    const ambiguityGroupsL2R = getLazySequenceTerms(computation.checkRightL2R, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
+      degree,
+      ambiguities
+    }));
+    state.ambiguityGroupsByOrientation = {
+      L2R: ambiguityGroupsL2R,
+      R2L: ambiguityGroupsR2L
+    };
+    state.selectedAmbiguityId = null;
+    refreshAmbiguitiesOutput(state);
+    setRelationPanelTab(state, "ambiguities");
+
+    const ambiguityGroups = state.ambiguityGroupsByOrientation[state.activePathOrientation];
+    for (const { degree, ambiguities } of ambiguityGroups) {
       console.log("render term", { degree, ambiguities: ambiguities.length });
       lines.push(`<div><strong>Gamma[${degree}]</strong> (${ambiguities.length})</div>`);
       if (ambiguities.length === 0) {
         lines.push(`<pre class="output-pre">(empty)</pre>`);
         continue;
       }
-      lines.push(`<pre class="output-pre">${escapeHtml(ambiguities.map(formatAmbiguity).join("\n"))}</pre>`);
+      lines.push(`<pre class="output-pre">${escapeHtml(ambiguities.map(formatAmbiguityForDisplay).join("\n"))}</pre>`);
     }
     lines.push(`<div class="field-note">${logOnlyLastTerm ? `Showing Gamma[${maxDegree}] only.` : `Showing Gamma[-1] through Gamma[${maxDegree}].`}</div>`);
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} render requested terms`);

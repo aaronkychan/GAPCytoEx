@@ -68,7 +68,7 @@ Frontend module responsibilities:
 - `monomial-computation-state.ts`: owns validation and cached aligned input for optional monomial-only computations.
 - `computation-controller.ts`: calls backend lazy sequences and converts finite requested ranges into output items.
 - `info-panel.ts`: renders current status and selected-item details only.
-- `output-panel.ts`: renders translator output, optional computation controls, and ambiguity/Bardzell/cohomology/cup-product output sections.
+- `output-panel.ts`: renders translator output, optional computation controls, and ambiguity/Hochschild-complex/cohomology/cup-product output sections.
 - `ambiguity-visualizer.ts`: owns path highlighting, flow animation, play/pause/speed, and reduced-motion fallback.
 - `theme.ts`: owns light/dark theme and persisted preference.
 

@@ -36,7 +36,7 @@ Backend tests:
 - `underlyingPathOfAmbiguity` concatenates ambiguity pieces correctly, including length-zero vertex paths;
 - minimal relation antichain minimising;
 - empty relation lists produce populated `Gamma[-1]` and `Gamma[0]`, with empty `Gamma[n]` for every `n >= 1`;
-- lazy ambiguity, Bardzell term, differential, and cohomology sequences compute only requested degrees and cache repeated `getAt(n)` calls;
+- lazy ambiguity, Hochschild cochain term, coboundary, and cohomology sequences compute only requested degrees and cache repeated `getAt(n)` calls;
 - `getArray(start, endInclusive)` returns the same data as repeated cached `getAt(n)` calls over that interval;
 - admissible basis enumeration and finite-dimensional failure path;
 - ambiguity sets for hand-computed examples;
@@ -44,10 +44,9 @@ Backend tests:
 - `computeRightAmbiguitiesL2R` follows the equivalent traversal-style right-ambiguity convention `u_n | ... | u_0 | u_{-1}`;
 - after applying `reverseOrientationOfAmbiguity`, `computeLeftAmbiguitiesR2L` and `computeRightAmbiguitiesL2R` return identical ambiguity sets degree by degree on test examples;
 - when the two ambiguity implementations disagree, `computeAmbiguities` returns an `orientation-mismatch` warning rather than silently choosing one;
-- Bardzell chain indexing: `terms.getAt(k)` is defined only for `k >= 0`, `terms.getAt(k)` uses `Gamma[k - 1]` for `k >= 1`, and `differentials.getAt(k)` is `d_k : terms[k] -> terms[k - 1]` for `k >= 1`;
+- Hochschild cochain indexing: `terms.getAt(n)` is defined only for `n >= 0`, `terms.getAt(n)` uses `Gamma[n]`, and `coboundaries.getAt(n)` is `d^n : terms[n] -> terms[n + 1]` for `n >= 0`;
 - negative `getAt` requests are rejected for every lazy sequence except ambiguity, where `getAt(-1)` is valid;
-- `differentials.getAt(0)`, if supported, returns the zero map without requesting `terms.getAt(-1)`;
-- differential matrices satisfy `partial * partial = 0`;
+- coboundary matrices satisfy `d^{n + 1} * d^n = 0`;
 - cohomology for small known examples;
 - cup product for quadratic and triangular examples.
 

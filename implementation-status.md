@@ -1,6 +1,6 @@
 # Implementation Status
 
-Current implementation boundary: Stage 1 implemented; human check required before Stage 2.
+Current implementation boundary: Stage 2 in progress; ambiguity computation and selectable ambiguity rows are implemented, canvas path-piece animation remains.
 
 - Original QPA/GAP `<->` Cytoscape translator behavior has been migrated into TypeScript modules; `legacy/` is reference-only and is not loaded by the root workbench DOM.
 - The root UI is the translator workbench, with one output region containing translator output and staged monomial-tool state.
@@ -16,7 +16,8 @@ Current implementation boundary: Stage 1 implemented; human check required befor
 - Backend helpers now tidy up monomial algebra input, keep generic relation types/formatters in `src/backend/relations.ts`, check `RelationData.terms` for monomial shape, eliminate binomial redundant-arrow relations by path replacement while ignoring scalars, remove duplicate/divisible relation paths with logs, and enumerate admissible paths using the minimised generators up to `maxPathLength`.
 - Backend ambiguity helpers now compute lazy primary `R2L` left ambiguities and development-check `L2R` right ambiguities, with `u_-1` stored as the target vertex in both conventions and orientation-mismatch warnings returned by `computeAmbiguities`.
 - The frontend has a `Compute ambiguities` trigger that validates the current monomial relation data, runs the backend ambiguity computation, and renders through the shared `Up to` computation bound in the existing Info/Log output area. The shared `Log only last term` option renders only the last requested lazy-sequence term.
-- Stage 2 clickable ambiguity rows and canvas path-piece animation are not implemented yet.
+- The relation panel becomes a two-tab Relations/Ambiguities panel after a successful ambiguity computation. The Ambiguities tab groups rows by `Gamma[n]`, alternates row colors, and supports row selection.
+- Stage 2 canvas path-piece animation for selected ambiguity rows is not implemented yet.
 
 Useful commands:
 

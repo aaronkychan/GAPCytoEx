@@ -40,7 +40,7 @@ Current Stage 1 decisions:
 
 The existing text boxes should not dominate the opening view. They remain available for import/export or debugging.
 
-The previous two-output mockup is rejected. Do not implement a separate `Output details` region below or beside a smaller output region. All translator output, compute controls, ambiguity rows, Bardzell/cohomology/cup-product rows, copy/export actions, warnings, and errors belong in the single `OutputPanel`.
+The previous two-output mockup is rejected. Do not implement a separate `Output details` region below or beside a smaller output region. All translator output, compute controls, ambiguity rows, Hochschild-complex/cohomology/cup-product rows, copy/export actions, warnings, and errors belong in the single `OutputPanel`.
 
 Recommended desktop geometry:
 
@@ -71,7 +71,7 @@ Recommended UI improvements that preserve the current structure:
 - Put optional computation controls inside `OutputPanel`, because they produce output and should not compete with graph-editing controls.
 - Include a compact path-orientation control, preferably a two-option segmented control: `L2R` and `R2L`. It may live near relation display/output controls, but it must not be confused with graph direction or arrow reversal.
 - The user may switch between `L2R` and `R2L` at any time, before or after relations and computation output exist. Switching convention re-renders relation rows, ambiguity rows, selected-item details, and path text in place; it must not clear the graph, relation list, output panel, or current selection.
-- Use tabs or segmented buttons inside the single `OutputPanel` for `QPA`, `Cytoscape JSON`, `Ambiguities`, `Bardzell`, `Cohomology`, and `Cup product` once multiple result types exist.
+- Use tabs or segmented buttons inside the single `OutputPanel` for `QPA`, `Cytoscape JSON`, `Ambiguities`, `Hochschild complex`, `Cohomology`, and `Cup product` once multiple result types exist.
 - Keep relation rows clickable and selectable; selected relation should update the info box and highlight the corresponding path on the canvas.
 - Keep computation rows clickable and selectable; selected ambiguity/cohomology item should update the info box and, when path data exists, highlight the canvas.
 - Replace long status strings near buttons with compact badges: `Unconfirmed`, `Confirmed`, `Stale`, `Computing`, `Error`.
@@ -138,7 +138,7 @@ Available controls:
 - maximum ambiguity index `N`;
 - `maxPathLength` for admissible path enumeration, shown as a numeric input or stepper, default `50`, minimum `20`;
 - compute ambiguities;
-- Bardzell, Hochschild cohomology, and cup-product controls may appear as disabled or staged placeholders before their implementation stage, but they must not run placeholder computations.
+- Hochschild-complex, Hochschild cohomology, and cup-product controls may appear as disabled or staged placeholders before their implementation stage, but they must not run placeholder computations.
 
 Before running any monomial-only computation:
 
@@ -155,7 +155,7 @@ Before running any monomial-only computation:
 Computation output behavior:
 
 - computation buttons write their finite rendered results to `OutputPanel`;
-- the panel is append-or-replace by computation type: rerunning ambiguities replaces the previous ambiguity block, while later Bardzell/cohomology/cup-product blocks may coexist as separate sections;
+- the panel is append-or-replace by computation type: rerunning ambiguities replaces the previous ambiguity block, while later Hochschild-complex/cohomology/cup-product blocks may coexist as separate sections;
 - there is no separate detail output panel. Detailed rows are expanded in place inside the single `OutputPanel`, and row selection sends concise details to `InfoPanel`;
 - each output section has a header, degree range, timestamp or stale marker, compact summary, and expandable detailed rows;
 - each row keeps a stable `id` so selecting it can update `InfoPanel` and trigger canvas highlighting/animation;

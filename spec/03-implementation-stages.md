@@ -22,17 +22,17 @@ Stage 2: ambiguity computation and visualization
 - Implement clickable ambiguity rows and path-piece animation.
 - Human check required before Stage 3.
 
-Stage 3: Bardzell chain complex
+Stage 3: Hochschild cochain complex
 
-- Implement the Bardzell resolution using chain-complex convention.
-- Use `terms[k]` built from `Gamma[k - 1]` for `k >= 1`.
-- Use only non-negative chain indices. Any negative `getAt` request outside the ambiguity sequence is an implementation error.
+- Implement the Hochschild cochain complex with terms
+  `Hom_{A^e}(Bzl_{n+1}(A), A) \cong \Bbbk \Gamma_n || \mathcal{B}`.
+- Use cochain degree `n >= 0`; degree `n` is built from `Gamma[n]` and admissible basis paths.
+- Use only non-negative cochain indices. Any negative `getAt` request outside the ambiguity sequence is an implementation error.
 - Human check required before Stage 4.
 
 Stage 4: Hochschild cohomology
 
-- Build the Hom complex from the approved Bardzell chain-complex implementation.
-- Compute degreewise Hochschild cohomology.
+- Compute degreewise Hochschild cohomology from the approved Hochschild cochain complex.
 - Add output rendering for cohomology groups and selected representatives.
 - Human check required before Stage 5.
 

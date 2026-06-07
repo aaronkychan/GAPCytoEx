@@ -30,7 +30,7 @@ Use a single computation controller as the boundary between UI events and backen
 interface ComputationController {
   validateMonomialComputationInput(): MonomialComputationState;
   computeAmbiguities(maxN: number): ComputationOutputItem[];
-  computeBardzellTerms(startDegree: number, endDegree: number): ComputationOutputItem[];
+  computeHochschildComplexTerms(startDegree: number, endDegree: number): ComputationOutputItem[];
   computeCohomology(startDegree: number, endDegree: number): ComputationOutputItem[];
   computeCupProducts(maxDegree: number): ComputationOutputItem[];
 }

@@ -1,7 +1,7 @@
 import { parseQpaInput } from "../backend/qpa-translator";
 import type { WorkbenchState } from "./workbench-state";
 import { bendArrow, clearAll, createInitialVertexAtClick, doubleQuiver, presentData } from "./cytoscape-view";
-import { editSelectedRelation, focusAddRelationEditor, guardRelationOutputEdit, selectRelation, setPathOrientation, toggleAddRelationMode } from "./relation-ui";
+import { editSelectedRelation, focusAddRelationEditor, guardRelationOutputEdit, selectRelation, setPathOrientation, setRelationPanelTab, toggleAddRelationMode } from "./relation-ui";
 import { appendInfoLog, setError, setFieldCharacteristic, setOutputHtml } from "./log-panel";
 import { loadJsonFile, saveFile, translateToQpa } from "./file-actions";
 import { applyTheme, initialTheme, toggleTheme } from "./theme";
@@ -79,6 +79,14 @@ export function bindWorkbenchEvents(state: WorkbenchState): void {
 
   document.getElementById("relOutput")?.addEventListener("beforeinput", (event) => guardRelationOutputEdit(state, event as InputEvent));
   document.getElementById("relOutput")?.addEventListener("mousedown", (event) => focusAddRelationEditor(state, event));
+  document.querySelectorAll<HTMLButtonElement>("[data-relation-panel-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const tab = button.dataset.relationPanelTab;
+      if (tab === "relations" || tab === "ambiguities") {
+        setRelationPanelTab(state, tab);
+      }
+    });
+  });
   document.getElementById("wriggle")?.addEventListener("click", () => {
     state.cy?.layout({ name: "cose", animate: true, animationDuration: 1500, randomize: false, nodeDimensionsIncludeLabels: true }).run();
   });

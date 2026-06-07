@@ -205,12 +205,21 @@
                   <h2>Relations</h2>
                 </div>
               </div>
-              <div class="relation-actions">
-                <input type="button" id="btnAddReln" value="Add relation(s)" />
-                <input type="button" id="btnEditReln" value="Edit relation" />
-                <input type="button" id="btnUnselectRelns" value="Unselect all" />
+              <div id="relationPanelTabs" class="relation-tabs" hidden>
+                <button type="button" data-relation-panel-tab="relations" aria-pressed="true">Relations</button>
+                <button type="button" data-relation-panel-tab="ambiguities" aria-pressed="false">Ambiguities</button>
               </div>
-              <div id="relOutput" contenteditable="false"></div>
+              <div id="relationsTabPanel" class="relation-tab-panel">
+                <div class="relation-actions">
+                  <input type="button" id="btnAddReln" value="Add relation(s)" />
+                  <input type="button" id="btnEditReln" value="Edit relation" />
+                  <input type="button" id="btnUnselectRelns" value="Unselect all" />
+                </div>
+                <div id="relOutput" contenteditable="false"></div>
+              </div>
+              <div id="ambiguitiesTabPanel" class="relation-tab-panel" hidden>
+                <div id="ambiguityOutput"></div>
+              </div>
             </aside>
 
             <div class="relation-canvas-splitter" data-resize-splitter="relations" role="separator" aria-label="Resize relation panel" tabindex="0"></div>
