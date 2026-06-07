@@ -92,17 +92,17 @@ Primary `R2L` left-ambiguity base data:
 
 - `Gamma[-1]`: one-piece decompositions containing length-zero vertex paths.
 - `Gamma[0]`: decompositions `[targetVertexPath, arrowPathR2L]`.
-- `Gamma[1]`: decompositions `[targetVertexPath, relationPathR2L]` for minimal monomial relations in `R2L` convention.
+- `Gamma[1]`: decompositions `[targetVertexPath, a, p]` for minimal monomial relations `a p` in `R2L` convention, where `a` is one arrow and `p` is a nonzero path.
 - If `Gamma[1]` is empty, then every `Gamma[n]` for `n >= 1` is empty.
 
 For `n >= 2`, compute the primary `R2L` left-ambiguity `Gamma[n]` inductively from `Gamma[n - 1]`:
 
 - assume the previous left-ambiguity decomposition `u_{-1} | u_0 | ... | u_{n-1}` is already valid by induction;
 - do not rescan or revalidate the whole underlying path from the beginning;
-- test only new paths `u_n` that right-append to the existing `(n - 1)`-ambiguity;
-- for a candidate minimal relation `r`, an overlap means that a nonempty word at the right end of `u_{n-1}` is exactly the same arrow word as a word at the left end of `r`;
-- right-append only the part of `r` that comes after this shared word;
-- after right-appending, the newly formed word `u_{n-1}u_n` must end with the whole relation `r`;
+- test only new paths `u_n` for which the adjacent pair `u_{n-1}u_n` is exactly a minimal relation generator;
+- for a candidate minimal relation `r`, the previous piece `u_{n-1}` must be a proper prefix of `r`;
+- append only the remaining suffix of `r`;
+- reject the candidate if any strict suffix of `u_{n-1}u_n` is itself a minimal relation generator;
 - split the right-appended part so `u_{n-1}` grows by all but its rightmost arrow, and that rightmost arrow becomes `u_n`;
 - do not extend by arbitrary admissible paths;
 - deduplicate by the full path word returned by `underlyingPathOfAmbiguity`.
@@ -117,13 +117,10 @@ Primary `R2L` left-ambiguity implementation logic:
 3. For every requested `n >= 2`, compute `Gamma[n]` from `Gamma[n - 1]`.
 4. For each previous ambiguity `amb` with pieces `[u_{-1}, u_0, ..., u_{n-1}]`, treat the previous ambiguity as already valid. Do not check the earlier pieces again.
 5. For each candidate extension, look only at `u_{n-1}` together with the proposed right-appended piece `u_n`.
-6. For each minimal relation `r`, find every proper overlap length `ell` satisfying:
-   - `1 <= ell < length(r)`;
-   - `ell <= length(u_{n-1})`;
-   - `suffix(u_{n-1}, ell) = prefix(r, ell)`.
-7. This means the rightmost `ell` arrows of `u_{n-1}` already match the leftmost `ell` arrows of `r`.
-8. For each valid overlap, define `rightAppend = r[ell:]`, the part of `r` after the shared word.
-9. The candidate is valid only when `suffix(u_{n-1} + rightAppend, length(r)) = r`, so the two rightmost non-vertex pieces `u_{n-1} | u_n` together contain the new relation occurrence on their right side.
+6. For each minimal relation `r`, require `u_{n-1}` to be a proper prefix of `r`.
+7. Define `rightAppend` to be the remaining suffix of `r` after this prefix.
+8. The candidate is valid only when `u_{n-1} + rightAppend = r`.
+9. Reject the candidate if any strict suffix of `u_{n-1} + rightAppend` is itself a minimal relation generator.
 10. Form the candidate underlying path `pNew = underlyingPathOfAmbiguity(amb) + rightAppend`. This concatenated path is used to construct and deduplicate the candidate, not to revalidate the old ambiguity from the beginning.
 11. Form the candidate piece list by replacing the previous rightmost non-vertex piece:
    - old pieces: `[u_{-1}, u_0, ..., u_{n-2}, u_{n-1}]`;

@@ -158,6 +158,16 @@ function wordsEqual(left: ArrowId[], right: ArrowId[]): boolean {
   return left.length === right.length && left.every((arrow, index) => arrow === right[index]);
 }
 
+function isStrictSuffixRelation(word: ArrowId[], relationWords: ArrowId[][]): boolean {
+  for (let length = 1; length < word.length; length += 1) {
+    const wordSuffix = suffix(word, length);
+    if (relationWords.some((relationWord) => wordsEqual(wordSuffix, relationWord))) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function ambiguityKey(ambiguity: Ambiguity): string {
   const path = underlyingPathOfAmbiguity(ambiguity);
   return `${path.orientation}:${path.source}:${path.target}:${printArrowWord(path.arrows)}`;
@@ -256,27 +266,35 @@ function gammaZeroL2R(quiver: Quiver): Ambiguity[] {
 }
 
 function gammaOneR2L(input: VerifiedMonomialAlgebra): Ambiguity[] {
-  return input.minimisedRelations.map((relation) => ({
-    n: 1,
-    pieces: [
-      vertexPath(relation.path.target, "R2L"),
-      pathFromWord(input.quiver, [...relation.path.arrows].reverse(), "R2L")
-    ],
-    orientation: "R2L" as const,
-    kind: "left" as const
-  }));
+  return input.minimisedRelations.map((relation) => {
+    const relationWord = [...relation.path.arrows].reverse();
+    return {
+      n: 1,
+      pieces: [
+        vertexPath(relation.path.target, "R2L"),
+        pathFromWord(input.quiver, [relationWord[0]], "R2L"),
+        pathFromWord(input.quiver, relationWord.slice(1), "R2L")
+      ],
+      orientation: "R2L" as const,
+      kind: "left" as const
+    };
+  });
 }
 
 function gammaOneL2R(input: VerifiedMonomialAlgebra): Ambiguity[] {
-  return input.minimisedRelations.map((relation) => ({
-    n: 1,
-    pieces: [
-      pathFromWord(input.quiver, relation.path.arrows, "L2R"),
-      vertexPath(relation.path.target, "L2R")
-    ],
-    orientation: "L2R" as const,
-    kind: "right" as const
-  }));
+  return input.minimisedRelations.map((relation) => {
+    const relationWord = relation.path.arrows;
+    return {
+      n: 1,
+      pieces: [
+        pathFromWord(input.quiver, relationWord.slice(0, -1), "L2R"),
+        pathFromWord(input.quiver, [relationWord[relationWord.length - 1]], "L2R"),
+        vertexPath(relation.path.target, "L2R")
+      ],
+      orientation: "L2R" as const,
+      kind: "right" as const
+    };
+  });
 }
 
 function computeNextLeftR2L(input: VerifiedMonomialAlgebra, previous: Ambiguity[], degree: number): Ambiguity[] {
@@ -296,37 +314,35 @@ function computeNextLeftR2L(input: VerifiedMonomialAlgebra, previous: Ambiguity[
     }
 
     for (const relationWord of relationWords) {
-      // Spec 05, steps 6-9: find a proper overlap and append only the relation tail.
-      for (let overlap = 1; overlap < relationWord.length && overlap <= lastPiece.arrows.length; overlap += 1) {
-        if (!wordsEqual(suffix(lastPiece.arrows, overlap), prefix(relationWord, overlap))) {
-          continue;
-        }
-        const rightAppend = relationWord.slice(overlap);
-        if (rightAppend.length === 0) {
-          continue;
-        }
-        const joinedRight = [...lastPiece.arrows, ...rightAppend];
-        if (!wordsEqual(suffix(joinedRight, relationWord.length), relationWord)) {
-          continue;
-        }
-
-        // Spec 05, steps 10-14: split the appended tail into the updated old piece and new final piece.
-        const appendedExceptLast = rightAppend.slice(0, -1);
-        const finalArrow = rightAppend[rightAppend.length - 1];
-        const nextPieces = ambiguity.pieces.slice(0, -1);
-        if (appendedExceptLast.length > 0) {
-          nextPieces.push(pathFromWord(input.quiver, [...lastPiece.arrows, ...appendedExceptLast], "R2L"));
-        } else {
-          nextPieces.push(lastPiece);
-        }
-        nextPieces.push(pathFromWord(input.quiver, [finalArrow], "R2L"));
-        candidates.push({
-          n: degree,
-          pieces: nextPieces,
-          orientation: "R2L",
-          kind: "left"
-        });
+      // Spec 05, steps 6-9: the adjacent pair u_{n-1} u_n must be exactly one relation.
+      if (
+        lastPiece.arrows.length >= relationWord.length ||
+        !wordsEqual(lastPiece.arrows, prefix(relationWord, lastPiece.arrows.length))
+      ) {
+        continue;
       }
+      const rightAppend = relationWord.slice(lastPiece.arrows.length);
+      const joinedRight = [...lastPiece.arrows, ...rightAppend];
+      if (!wordsEqual(joinedRight, relationWord) || isStrictSuffixRelation(joinedRight, relationWords)) {
+        continue;
+      }
+
+      // Spec 05, steps 10-14: split the appended tail into the updated old piece and new final piece.
+      const appendedExceptLast = rightAppend.slice(0, -1);
+      const finalArrow = rightAppend[rightAppend.length - 1];
+      const nextPieces = ambiguity.pieces.slice(0, -1);
+      if (appendedExceptLast.length > 0) {
+        nextPieces.push(pathFromWord(input.quiver, [...lastPiece.arrows, ...appendedExceptLast], "R2L"));
+      } else {
+        nextPieces.push(lastPiece);
+      }
+      nextPieces.push(pathFromWord(input.quiver, [finalArrow], "R2L"));
+      candidates.push({
+        n: degree,
+        pieces: nextPieces,
+        orientation: "R2L",
+        kind: "left"
+      });
     }
   }
 
@@ -356,37 +372,35 @@ function computeNextRightL2R(input: VerifiedMonomialAlgebra, previous: Ambiguity
     }
 
     for (const relationWord of relationWords) {
-      // L2R mirror of Spec 05, steps 6-9: find a proper overlap and prepend only the relation head.
-      for (let overlap = 1; overlap < relationWord.length && overlap <= firstPiece.arrows.length; overlap += 1) {
-        if (!wordsEqual(suffix(relationWord, overlap), prefix(firstPiece.arrows, overlap))) {
-          continue;
-        }
-        const leftPrepend = relationWord.slice(0, relationWord.length - overlap);
-        if (leftPrepend.length === 0) {
-          continue;
-        }
-        const joinedLeft = [...leftPrepend, ...firstPiece.arrows];
-        if (!wordsEqual(prefix(joinedLeft, relationWord.length), relationWord)) {
-          continue;
-        }
-
-        // L2R mirror of Spec 05, steps 10-14: split the prepended head into the new first piece and updated old piece.
-        const firstArrow = leftPrepend[0];
-        const remainingPrepend = leftPrepend.slice(1);
-        const nextPieces: Path[] = [pathFromWord(input.quiver, [firstArrow], "L2R")];
-        if (remainingPrepend.length > 0) {
-          nextPieces.push(pathFromWord(input.quiver, [...remainingPrepend, ...firstPiece.arrows], "L2R"));
-          nextPieces.push(...ambiguity.pieces.slice(1));
-        } else {
-          nextPieces.push(...ambiguity.pieces);
-        }
-        candidates.push({
-          n: degree,
-          pieces: nextPieces,
-          orientation: "L2R",
-          kind: "right"
-        });
+      // L2R mirror of Spec 05, steps 6-9: the adjacent pair must be exactly one relation.
+      if (
+        firstPiece.arrows.length >= relationWord.length ||
+        !wordsEqual(firstPiece.arrows, suffix(relationWord, firstPiece.arrows.length))
+      ) {
+        continue;
       }
+      const leftPrepend = relationWord.slice(0, relationWord.length - firstPiece.arrows.length);
+      const joinedLeft = [...leftPrepend, ...firstPiece.arrows];
+      if (!wordsEqual(joinedLeft, relationWord) || isStrictSuffixRelation(joinedLeft, relationWords)) {
+        continue;
+      }
+
+      // L2R mirror of Spec 05, steps 10-14: split the prepended head into the new first piece and updated old piece.
+      const firstArrow = leftPrepend[0];
+      const remainingPrepend = leftPrepend.slice(1);
+      const nextPieces: Path[] = [pathFromWord(input.quiver, [firstArrow], "L2R")];
+      if (remainingPrepend.length > 0) {
+        nextPieces.push(pathFromWord(input.quiver, [...remainingPrepend, ...firstPiece.arrows], "L2R"));
+        nextPieces.push(...ambiguity.pieces.slice(1));
+      } else {
+        nextPieces.push(...ambiguity.pieces);
+      }
+      candidates.push({
+        n: degree,
+        pieces: nextPieces,
+        orientation: "L2R",
+        kind: "right"
+      });
     }
   }
 

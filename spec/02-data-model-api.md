@@ -136,8 +136,8 @@ The helper `underlyingPathOfAmbiguity` concatenates the pieces in their stored w
 Conventions:
 
 - `Gamma[-1]` entries have `pieces = [vertexPath]`, where `vertexPath` has length zero.
-- For `R2L` left ambiguities, `Gamma[0]` entries have `pieces = [targetVertexPath, arrowPathR2L]`, and `Gamma[1]` relation `r = a_m ... a_1` is stored as `[targetVertexPath, relationPathR2L]` in `R2L` word order.
-- For `L2R` right ambiguities, `Gamma[0]` entries have `pieces = [arrowPathL2R, targetVertexPath]`, and `Gamma[1]` relation `r = a_1 ... a_m` is stored as `[relationPathL2R, targetVertexPath]` in `L2R` word order.
+- For `R2L` left ambiguities, `Gamma[0]` entries have `pieces = [targetVertexPath, arrowPathR2L]`, and `Gamma[1]` relation `r = a p` in `R2L` word order is stored as `[targetVertexPath, a, p]`, where `a` is one arrow and `p` is a nonzero path.
+- For `L2R` right ambiguities, `Gamma[0]` entries have `pieces = [arrowPathL2R, targetVertexPath]`, and `Gamma[1]` relation `r = p a` in `L2R` word order is stored as `[p, a, targetVertexPath]`, where `a` is one arrow and `p` is a nonzero path.
 - If the minimal relation set is empty, then `Gamma[1]` is empty and `Gamma[n]` is empty for every `n >= 1`.
 - For `n >= 2`, `pieces` is the inductively constructed ambiguity decomposition in its declared `orientation` and `kind`.
 - Deduplication is by `underlyingPathOfAmbiguity(ambiguity)`, but UI display and differential logic must retain `pieces`.

@@ -5,6 +5,13 @@ export function setOutputHtml(html: string): void {
   }
 }
 
+function appendLogDivider(output: HTMLElement): void {
+  const divider = document.createElement("div");
+  divider.textContent = "-----------";
+  output.appendChild(divider);
+  output.appendChild(document.createElement("br"));
+}
+
 export function appendOutputHtml(html: string): void {
   const output = document.getElementById("outTxtBox");
   if (!output) {
@@ -13,6 +20,7 @@ export function appendOutputHtml(html: string): void {
   const entry = document.createElement("div");
   entry.innerHTML = html;
   output.appendChild(entry);
+  appendLogDivider(output);
 }
 
 export function setError(message: string): void {
@@ -36,6 +44,7 @@ export function appendInfoLog(message: string): void {
   const line = document.createElement("div");
   line.textContent = message;
   output.appendChild(line);
+  appendLogDivider(output);
 }
 
 export function characteristicText(characteristic: number): string {

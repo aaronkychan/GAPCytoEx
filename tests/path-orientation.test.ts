@@ -488,22 +488,47 @@ test("computeLeftAmbiguitiesR2L stores target vertex as u minus one", () => {
   });
 });
 
-test("compute ambiguity sequences agree after reversing orientation", () => {
+test("Gamma one stores a split arrow and nonzero path for relation generators", () => {
   const quiver: Quiver = {
-    vertices: [{ id: "v1" }, { id: "v2" }, { id: "v3" }, { id: "v4" }, { id: "v5" }],
+    vertices: [{ id: "v1" }, { id: "v2" }, { id: "v3" }, { id: "v4" }],
     arrows: [
       { id: "a", source: "v1", target: "v2", label: "a" },
       { id: "b", source: "v2", target: "v3", label: "b" },
-      { id: "c", source: "v3", target: "v4", label: "c" },
-      { id: "d", source: "v4", target: "v5", label: "d" },
-      { id: "e", source: "v5", target: "v1", label: "e" }
+      { id: "c", source: "v3", target: "v4", label: "c" }
+    ]
+  };
+  const verified = tidyUpMonomialAlgebra({
+    quiver,
+    relations: [relationFromL2R("abc", pathFromArrowIdsL2R(quiver, ["a", "b", "c"]))],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+
+  const leftGamma1 = computeLeftAmbiguitiesR2L(verified).getAt(1);
+  const rightGamma1 = computeRightAmbiguitiesL2R(verified).getAt(1);
+
+  expect(leftGamma1[0].pieces.map((piece) => piece.arrows)).toEqual([[], ["c"], ["b", "a"]]);
+  expect(leftGamma1[0].pieces[0].target).toBe("v4");
+  expect(rightGamma1[0].pieces.map((piece) => piece.arrows)).toEqual([["a", "b"], ["c"], []]);
+  expect(rightGamma1[0].pieces[2].target).toBe("v4");
+  expect(reverseOrientationOfAmbiguity(leftGamma1[0])).toEqual(rightGamma1[0]);
+});
+
+test("compute ambiguity sequences agree after reversing orientation", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v" }],
+    arrows: [
+      { id: "a", source: "v", target: "v", label: "a" },
+      { id: "b", source: "v", target: "v", label: "b" },
+      { id: "c", source: "v", target: "v", label: "c" },
+      { id: "d", source: "v", target: "v", label: "d" }
     ]
   };
   const verified = tidyUpMonomialAlgebra({
     quiver,
     relations: [
-      relationFromL2R("abc", pathFromArrowIdsL2R(quiver, ["a", "b", "c"])),
-      relationFromL2R("cde", pathFromArrowIdsL2R(quiver, ["c", "d", "e"]))
+      relationFromL2R("cba", pathFromArrowIdsL2R(quiver, ["c", "b", "a"])),
+      relationFromL2R("dcb", pathFromArrowIdsL2R(quiver, ["d", "c", "b"]))
     ],
     activeOrientation: "R2L",
     maxPathLength: 20
@@ -512,29 +537,54 @@ test("compute ambiguity sequences agree after reversing orientation", () => {
   const leftGamma2 = computeLeftAmbiguitiesR2L(verified).getAt(2);
   const rightGamma2 = computeRightAmbiguitiesL2R(verified).getAt(2);
 
-  expect(leftGamma2.map((ambiguity) => underlyingPathOfAmbiguity(ambiguity).arrows)).toContainEqual(["e", "d", "c", "b", "a"]);
+  expect(leftGamma2.map((ambiguity) => underlyingPathOfAmbiguity(ambiguity).arrows)).toContainEqual(["a", "b", "c", "d"]);
   expect(leftGamma2.some((ambiguity) => ambiguity.pieces.some((piece) => piece.arrows.length > 1))).toBe(true);
-  expect(rightGamma2.map((ambiguity) => underlyingPathOfAmbiguity(ambiguity).arrows)).toContainEqual(["a", "b", "c", "d", "e"]);
-  expect(leftGamma2.map((ambiguity) => reverseOrientationOfAmbiguity(ambiguity).pieces.map((piece) => piece.arrows))).toContainEqual([["a"], ["b", "c", "d", "e"], []]);
+  expect(rightGamma2.map((ambiguity) => underlyingPathOfAmbiguity(ambiguity).arrows)).toContainEqual(["d", "c", "b", "a"]);
+  expect(leftGamma2.map((ambiguity) => ambiguity.pieces.map((piece) => piece.arrows))).toContainEqual([[], ["a"], ["b", "c"], ["d"]]);
+  expect(leftGamma2.map((ambiguity) => reverseOrientationOfAmbiguity(ambiguity).pieces.map((piece) => piece.arrows))).toContainEqual([["d"], ["c", "b"], ["a"], []]);
+});
+
+test("left ambiguities reject candidates whose adjacent pair only has a relation as strict suffix", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v" }],
+    arrows: [
+      { id: "x", source: "v", target: "v", label: "x" },
+      { id: "y", source: "v", target: "v", label: "y" },
+      { id: "z", source: "v", target: "v", label: "z" },
+      { id: "t", source: "v", target: "v", label: "t" }
+    ]
+  };
+  const verified = tidyUpMonomialAlgebra({
+    quiver,
+    relations: [
+      relationFromL2R("zyx", pathFromArrowIdsL2R(quiver, ["z", "y", "x"])),
+      relationFromL2R("tz", pathFromArrowIdsL2R(quiver, ["t", "z"]))
+    ],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+
+  const leftGamma2 = computeLeftAmbiguitiesR2L(verified).getAt(2);
+
+  expect(leftGamma2.map((ambiguity) => ambiguity.pieces.map((piece) => piece.arrows))).not.toContainEqual([[], ["x"], ["y", "z"], ["t"]]);
 });
 
 test("computeAmbiguities reports no warning when R2L and L2R conventions agree", () => {
   const quiver: Quiver = {
-    vertices: [{ id: "v1" }, { id: "v2" }, { id: "v3" }, { id: "v4" }, { id: "v5" }],
+    vertices: [{ id: "v" }],
     arrows: [
-      { id: "a", source: "v1", target: "v2", label: "a" },
-      { id: "b", source: "v2", target: "v3", label: "b" },
-      { id: "c", source: "v3", target: "v4", label: "c" },
-      { id: "d", source: "v4", target: "v5", label: "d" },
-      { id: "e", source: "v5", target: "v1", label: "e" }
+      { id: "a", source: "v", target: "v", label: "a" },
+      { id: "b", source: "v", target: "v", label: "b" },
+      { id: "c", source: "v", target: "v", label: "c" },
+      { id: "d", source: "v", target: "v", label: "d" }
     ]
   };
 
   const result = computeAmbiguities({
     quiver,
     relations: [
-      relationFromL2R("abc", pathFromArrowIdsL2R(quiver, ["a", "b", "c"])),
-      relationFromL2R("cde", pathFromArrowIdsL2R(quiver, ["c", "d", "e"]))
+      relationFromL2R("cba", pathFromArrowIdsL2R(quiver, ["c", "b", "a"])),
+      relationFromL2R("dcb", pathFromArrowIdsL2R(quiver, ["d", "c", "b"]))
     ],
     activeOrientation: "R2L",
     maxPathLength: 20
