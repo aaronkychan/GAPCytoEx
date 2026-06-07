@@ -18,6 +18,7 @@ import {
   computeAmbiguities,
   computeLeftAmbiguitiesR2L,
   computeRightAmbiguitiesL2R,
+  getLazySequenceTerms,
   reverseOrientationOfAmbiguity,
   underlyingPathOfAmbiguity,
   type Ambiguity
@@ -542,4 +543,30 @@ test("computeAmbiguities reports no warning when R2L and L2R conventions agree",
   expect(result.warnings).toEqual([]);
   expect(result.primaryLeftR2L.getAt(2)).not.toHaveLength(0);
   expect(result.checkRightL2R.getAt(2)).not.toHaveLength(0);
+});
+
+test("getLazySequenceTerms can return only the last requested term", () => {
+  const sequence = {
+    getAt(index: number): string {
+      return `term-${index}`;
+    },
+    *getIteratorFrom(start: number): IterableIterator<[number, string]> {
+      yield [start, `term-${start}`];
+    },
+    getArray(start: number, endInclusive: number): Array<[number, string]> {
+      const result: Array<[number, string]> = [];
+      for (let index = start; index <= endInclusive; index += 1) {
+        result.push([index, `term-${index}`]);
+      }
+      return result;
+    }
+  };
+
+  expect(getLazySequenceTerms(sequence, -1, 2, false)).toEqual([
+    [-1, "term--1"],
+    [0, "term-0"],
+    [1, "term-1"],
+    [2, "term-2"]
+  ]);
+  expect(getLazySequenceTerms(sequence, -1, 2, true)).toEqual([[2, "term-2"]]);
 });

@@ -9,6 +9,15 @@ export function setError(message: string): void {
   setOutputHtml(`<span style='color:red; font-size: 20pt'>${message}</span>`);
 }
 
+export function setInfoStatus(message: string, isWarning = false): void {
+  const status = document.getElementById("info-status");
+  if (!status) {
+    return;
+  }
+  status.textContent = message;
+  status.classList.toggle("status-warn", isWarning);
+}
+
 export function appendInfoLog(message: string): void {
   const output = document.getElementById("outTxtBox");
   if (!output) {

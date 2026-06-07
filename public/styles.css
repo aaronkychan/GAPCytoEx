@@ -653,8 +653,9 @@ a {
   margin-top: 0.5rem;
 }
 
-#max-path-length {
-  width: 7rem;
+#max-path-length,
+#compute-term-bound {
+  width: 4.5rem;
 }
 
 @media (max-width: 840px) {
@@ -1211,6 +1212,18 @@ input[type="button"]:hover:not(:disabled) {
   min-height: 220px;
 }
 
+.output-pre {
+  margin: 6px 0 12px;
+  white-space: pre-wrap;
+  font-family: ui-monospace, "Cascadia Code", "Segoe UI Mono", monospace;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.status-warn {
+  color: #b42318;
+}
+
 .output-tabs,
 .stage-output,
 .monomial-controls,
@@ -1380,13 +1393,13 @@ input[type="button"]:hover:not(:disabled) {
 }
 
 .monomial-section {
-  flex: 0 0 14rem;
-  min-width: 14rem;
+  flex: 0 0 22rem;
+  min-width: 22rem;
 }
 
 .monomial-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   gap: 0.45rem;
 }
@@ -1395,9 +1408,40 @@ input[type="button"]:hover:not(:disabled) {
   margin: 0;
 }
 
-.monomial-grid button,
-.monomial-grid input {
+.monomial-grid button {
   width: 100%;
+}
+
+.term-bound-control,
+.max-path-control,
+.log-last-control {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  grid-column: 1 / -1;
+}
+
+.term-bound-control {
+  justify-content: flex-start;
+}
+
+.max-path-control {
+  justify-content: flex-end;
+  font-size: 0.78rem;
+}
+
+.log-last-control {
+  justify-content: flex-start;
+  font-size: 0.78rem;
+}
+
+.log-last-control input {
+  width: auto;
+}
+
+.max-path-control input {
+  font-size: 0.78rem;
+  padding: 0.18rem 0.3rem;
 }
 
 .button-row {

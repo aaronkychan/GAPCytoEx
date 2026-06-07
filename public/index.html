@@ -161,14 +161,23 @@
             <div class="control-section monomial-section">
               <div class="control-title">Monomial algebra</div>
               <div class="monomial-grid">
-                <label>
-                  maxPathLength
-                  <input id="max-path-length" type="number" min="20" value="50" />
+                <label class="term-bound-control">
+                  <span>Up to</span>
+                  <input id="compute-term-bound" type="number" min="0" value="5" />
+                  <span>terms:</span>
                 </label>
-                <button type="button" disabled>Ambiguities</button>
+                <button type="button" id="computeAmbiguitiesBtn">Compute ambiguities</button>
                 <button type="button" disabled>Bardzell</button>
                 <button type="button" disabled>Hochschild cohomology</button>
                 <button type="button" disabled>Cup product</button>
+                <label class="log-last-control">
+                  <input id="log-only-last-term" type="checkbox" />
+                  <span>Log only last term</span>
+                </label>
+                <label class="max-path-control">
+                  <span>maxPathLength</span>
+                  <input id="max-path-length" type="number" min="20" value="50" />
+                </label>
               </div>
             </div>
           </section>

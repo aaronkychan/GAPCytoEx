@@ -15,7 +15,8 @@ Current implementation boundary: Stage 1 implemented; human check required befor
 - `maxPathLength` is visible in the output/computation controls, defaults to `50`, and rejects values below `20`.
 - Backend helpers now tidy up monomial algebra input, keep generic relation types/formatters in `src/backend/relations.ts`, check `RelationData.terms` for monomial shape, eliminate binomial redundant-arrow relations by path replacement while ignoring scalars, remove duplicate/divisible relation paths with logs, and enumerate admissible paths using the minimised generators up to `maxPathLength`.
 - Backend ambiguity helpers now compute lazy primary `R2L` left ambiguities and development-check `L2R` right ambiguities, with `u_-1` stored as the target vertex in both conventions and orientation-mismatch warnings returned by `computeAmbiguities`.
-- Stage 2 frontend ambiguity UI and visualization are not implemented yet.
+- The frontend has a `Compute ambiguities` trigger that validates the current monomial relation data, runs the backend ambiguity computation, and renders through the shared `Up to` computation bound in the existing Info/Log output area. The shared `Log only last term` option renders only the last requested lazy-sequence term.
+- Stage 2 clickable ambiguity rows and canvas path-piece animation are not implemented yet.
 
 Useful commands:
 

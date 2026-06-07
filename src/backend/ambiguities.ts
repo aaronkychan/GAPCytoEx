@@ -41,6 +41,20 @@ export interface AmbiguityComputation {
   warnings: AmbiguityComparisonWarning[];
 }
 
+export function getLazySequenceTerms<T>(
+  sequence: LazySequence<T>,
+  start: number,
+  endInclusive: number,
+  logOnlyLastTerm = false
+): Array<[number, T]> {
+  if (endInclusive < start) {
+    return [];
+  }
+  return logOnlyLastTerm
+    ? [[endInclusive, sequence.getAt(endInclusive)]]
+    : sequence.getArray(start, endInclusive);
+}
+
 export function underlyingPathOfAmbiguity(ambiguity: Ambiguity): Path {
   const nonVertexPieces = ambiguity.pieces.filter((piece) => piece.arrows.length > 0);
   const first = ambiguity.orientation === "R2L" ? nonVertexPieces[nonVertexPieces.length - 1] : ambiguity.pieces[0];
@@ -368,8 +382,7 @@ function equivalentAmbiguityLists(leftR2L: Ambiguity[], rightL2R: Ambiguity[]): 
   return wordsEqual(leftKeys, rightKeys);
 }
 
-export function computeAmbiguities(input: MonomialAlgebraInput): AmbiguityComputation {
-  const verified = tidyUpMonomialAlgebra(input);
+export function computeAmbiguitiesFromVerified(verified: VerifiedMonomialAlgebra): AmbiguityComputation {
   const primaryLeftR2L = computeLeftAmbiguitiesR2L(verified);
   const checkRightL2R = computeRightAmbiguitiesL2R(verified);
   const warnings: AmbiguityComparisonWarning[] = [];
@@ -394,4 +407,8 @@ export function computeAmbiguities(input: MonomialAlgebraInput): AmbiguityComput
     checkRightL2R,
     warnings
   };
+}
+
+export function computeAmbiguities(input: MonomialAlgebraInput): AmbiguityComputation {
+  return computeAmbiguitiesFromVerified(tidyUpMonomialAlgebra(input));
 }

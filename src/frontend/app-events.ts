@@ -5,6 +5,7 @@ import { editSelectedRelation, focusAddRelationEditor, guardRelationOutputEdit, 
 import { appendInfoLog, setError, setFieldCharacteristic, setOutputHtml } from "./log-panel";
 import { loadJsonFile, saveFile, translateToQpa } from "./file-actions";
 import { applyTheme, initialTheme, toggleTheme } from "./theme";
+import { computeAndRenderAmbiguities } from "./computation-controller";
 
 function bindClick(id: string, handler: (event: MouseEvent) => void): void {
   document.getElementById(id)?.addEventListener("click", (event) => handler(event as MouseEvent));
@@ -43,6 +44,7 @@ export function bindWorkbenchEvents(state: WorkbenchState): void {
   bindClick("btnAddReln", () => toggleAddRelationMode(state));
   bindClick("btnEditReln", () => editSelectedRelation(state));
   bindClick("toQPABtn", () => translateToQpa(state));
+  bindClick("computeAmbiguitiesBtn", () => computeAndRenderAmbiguities(state));
   bindClick("resetCanvasRelations", () => clearAll(state));
   bindClick("clearOutput", () => setOutputHtml(""));
   bindClick("clearQuiverInput", () => {
