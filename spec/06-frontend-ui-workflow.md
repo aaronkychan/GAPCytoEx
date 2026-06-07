@@ -121,10 +121,11 @@ This records monomial relation paths directly as arrow ID arrays for backend inp
 
 Path-orientation display behavior:
 
+- The header shows the assumed or detected characteristic to the left of the `Path orientation` label. Before QPA relation parsing detects a finite characteristic, this reads `Characteristic 0 (real)`.
 - Relation builder records paths in `L2R` Cytoscape traversal order.
-- After saving a relation, the frontend stores both `pathL2R` and `pathR2L`.
-- If the user selects `L2R`, relation rows display `pathL2R`.
-- If the user selects `R2L`, relation rows display `pathR2L`.
+- After saving a relation, the frontend stores one canonical `L2R` relation path.
+- If the user selects `L2R`, relation rows display the stored path.
+- If the user selects `R2L`, relation rows display `reverseOrientation(path)`.
 - Switching the display convention is allowed at any time and must not mutate the quiver, reverse arrows, clear results, or change GAP/QPA export behavior.
 - GAP/QPA import/export remains `L2R` only, regardless of the active display convention.
 
@@ -146,7 +147,7 @@ Before running any monomial-only computation:
 - allow an empty relation list;
 - if any relation is a linear combination, has multiple terms, contains a malformed path, or otherwise is not monomial, show a warning in `InfoPanel` and do not run the computation;
 - specifically, pressing `Compute ambiguities` must first run this validation guard. If validation reports a non-monomial relation, malformed path, or stale unparsable relation state, the handler must return immediately before calling `computeAmbiguities` or any backend ambiguity helper;
-- after validation passes, pressing `Compute ambiguities` must normalize both `L2R` and `R2L` relation copies before computing;
+- after validation passes, pressing `Compute ambiguities` must align both `L2R` and `R2L` relation copies before computing;
 - validate `maxPathLength >= 20`; if not, show a warning in `InfoPanel` and do not run the computation;
 - leave the previous `OutputPanel` results unchanged unless the user explicitly clears or reruns a valid computation;
 - do not silently skip non-monomial relations and compute from the remaining subset.

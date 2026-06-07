@@ -4,9 +4,9 @@ import {
   DEFAULT_MAX_PATH_LENGTH,
   pathFromArrowIdsL2R,
   relationFromL2R,
-  type MonomialAlgebraInput,
-  type MonomialRelation
+  type MonomialAlgebraInput
 } from "../backend/monomial-algebra";
+import type { RelationGenerator } from "../backend/relations";
 
 export interface CytoscapeElementData {
   group?: "nodes" | "edges";
@@ -51,10 +51,10 @@ export function relationPathsToRelations(
   quiver: Quiver,
   relations: RelationPath[],
   activeOrientation: PathOrientation
-): MonomialRelation[] {
+): RelationGenerator[] {
   return relations.map((relation, index) => {
-    const pathL2R = pathFromArrowIdsL2R(quiver, relation.arrows);
-    return relationFromL2R(relation.id ?? `r${index + 1}`, pathL2R, activeOrientation);
+    const path = pathFromArrowIdsL2R(quiver, relation.arrows);
+    return relationFromL2R(relation.id ?? `r${index + 1}`, path);
   });
 }
 

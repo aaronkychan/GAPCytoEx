@@ -7,8 +7,8 @@ Stage 1: translator-preserving UI and orientation foundation
 - Keep all original `GAPToCyto` translator capabilities.
 - Establish the redesigned single-output UI layout.
 - Implement the `L2R` / `R2L` display switch.
-- Provide TypeScript helpers that can store both `pathL2R` and `pathR2L` for relation paths.
-- In the current legacy UI, keep the existing relation `terms` shape; `R2L` is display-only until ambiguity cross-check work begins.
+- Provide TypeScript helpers that store canonical `L2R` relation paths and derive `R2L` display with `reverseOrientation`.
+- Keep the existing relation `terms` shape; `R2L` is display-only until ambiguity cross-check work begins.
 - Add visible `maxPathLength` control with default `50` and minimum `20`.
 - Defer the graphical relation-builder workflow to a stretch goal; it is not required before Stage 2.
 - Human check required before Stage 2.

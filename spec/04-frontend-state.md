@@ -18,7 +18,7 @@ State roles:
 
 - `GraphUiState`: Cytoscape element data, selected graph edit mode, and canvas display preferences.
 - `RelationUiState`: relation builder state, saved relation paths, selected relation index, and relation validation messages.
-- `MonomialComputationState`: last valid `MonomialAlgebraInput`, normalized backend algebra, valid/stale status, and monomial-validation summary.
+- `MonomialComputationState`: last valid `MonomialAlgebraInput`, aligned backend algebra, valid/stale status, and monomial-validation summary.
 - `ComputationUiState`: lazy backend objects plus finite rendered slices requested by the UI.
 - `SelectionState`: selected vertex, arrow, relation, ambiguity, cohomology class, or output item.
 - `OrientationState`: active path display convention, either `L2R` or `R2L`.

@@ -17,7 +17,7 @@ Rules:
 - Edge `id` is the canonical `ArrowId`; edge `label` is display only.
 - Relation paths are stored by arrow IDs, not labels.
 - Relations produced from Cytoscape selection are recorded as `L2R` traversal paths.
-- The adapter must call `reverseOrientation` to populate `pathR2L`.
+- The adapter stores canonical `L2R` relation paths. Display code calls `reverseOrientation` for `R2L` output.
 - `MonomialAlgebraInput.activeOrientation` records the user's current display convention. Ambiguity computation still uses the primary `R2L` algorithm plus the development `L2R` cross-check.
 - `MonomialAlgebraInput.maxPathLength` records the user's admissible-path enumeration bound and must default to `50` when no explicit value is provided.
 - The adapter allows an empty relation list and validates that each listed relation path is composable in the current quiver.
@@ -31,10 +31,10 @@ Backend tests:
 - path composition, divisor detection, residual path extraction, and relation containment;
 - `reverseOrientation` reverses path-word order, toggles `L2R`/`R2L`, preserves mathematical source/target, and does not reverse quiver arrows;
 - `reverseOrientationOfAmbiguity` reverses ambiguity piece order, applies `reverseOrientation` to each piece, and preserves the mathematical underlying path;
-- `normalizeOrientedInput` stores both `relationsL2R` and `relationsR2L` for every monomial relation;
+- `tidyUpMonomialAlgebra` stores `originalRelations` and `minimisedRelations` for every verified monomial relation list;
 - `maxPathLength` defaults to `50`, rejects values below `20`, and is used as the admissible-path enumeration safety bound;
 - `underlyingPathOfAmbiguity` concatenates ambiguity pieces correctly, including length-zero vertex paths;
-- minimal relation antichain normalization;
+- minimal relation antichain minimising;
 - empty relation lists produce populated `Gamma[-1]` and `Gamma[0]`, with empty `Gamma[n]` for every `n >= 1`;
 - lazy ambiguity, Bardzell term, differential, and cohomology sequences compute only requested degrees and cache repeated `getAt(n)` calls;
 - `getArray(start, endInclusive)` returns the same data as repeated cached `getAt(n)` calls over that interval;

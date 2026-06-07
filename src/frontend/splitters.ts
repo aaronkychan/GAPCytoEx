@@ -1,3 +1,9 @@
+declare global {
+  interface Window {
+    cy?: { fit: () => void; resize?: () => void };
+  }
+}
+
 function fitCy(): void {
   if (window.cy && typeof window.cy.resize === "function") {
     window.cy.resize();
@@ -13,17 +19,6 @@ interface ResizeOptions {
   max: number;
   side: "left" | "right";
   gridTemplate: (width: number) => string;
-}
-
-declare global {
-  interface Window {
-    GAPCytoEx?: {
-      splittersBound?: {
-        info: boolean;
-        relations: boolean;
-      };
-    };
-  }
 }
 
 function bindHorizontalResize(splitter: HTMLElement | null, target: HTMLElement | null, options: ResizeOptions): void {
@@ -103,14 +98,6 @@ function bindSplittersNow(): void {
       gridTemplate: (width) => `minmax(190px, ${width}px) 12px minmax(0, 1fr)`
     }
   );
-
-  window.GAPCytoEx = {
-    ...(window.GAPCytoEx || {}),
-    splittersBound: {
-      info: Boolean(infoSplitter && infoTarget),
-      relations: Boolean(relationSplitter && relationTarget)
-    }
-  };
 }
 
 function bindSplitters(): void {

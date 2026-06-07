@@ -21,6 +21,7 @@ src/
   backend/
     quiver.ts
     paths.ts
+    relations.ts
     path-orientation.ts
     monomial-algebra.ts
     ambiguities.ts
@@ -32,8 +33,12 @@ src/
     app-state.ts
     app-events.ts
     cytoscape-adapter.ts
+    cytoscape-style.ts
     cytoscape-view.ts
+    file-actions.ts
+    log-panel.ts
     relation-builder.ts
+    relation-ui.ts
     relation-list-panel.ts
     orientation-control.ts
     monomial-computation-state.ts
@@ -52,11 +57,15 @@ Frontend module responsibilities:
 - `app-state.ts`: defines frontend state types and state transition helpers.
 - `app-events.ts`: centralizes DOM event wiring so handlers are easy to audit.
 - `cytoscape-adapter.ts`: converts between Cytoscape elements and backend `Quiver` / `Path` data.
-- `cytoscape-view.ts`: owns Cytoscape initialization, style, selection, layout, fit, save/export, and canvas commands.
+- `cytoscape-style.ts`: owns Cytoscape style helpers shared by graph rendering and relation highlighting.
+- `cytoscape-view.ts`: owns Cytoscape initialization, selection, layout, fit, and canvas commands.
+- `file-actions.ts`: owns save/load/export actions for SVG, JSON, and QPA text.
+- `log-panel.ts`: owns status, characteristic, and output/log rendering.
 - `relation-builder.ts`: owns path-selection mode, next-arrow restrictions, undo/cancel/save behavior.
-- `relation-list-panel.ts`: renders saved relations and relation selection/editing state.
+- `relation-ui.ts`: owns saved relation rendering, relation selection/editing state, and relation-list event behavior.
+- `relation-list-panel.ts`: may host future componentized relation-list rendering once the relation builder is resumed.
 - `orientation-control.ts`: owns the user-facing path-orientation picker and updates relation/output display between `L2R` and `R2L` without mutating the underlying quiver.
-- `monomial-computation-state.ts`: owns validation and cached normalized input for optional monomial-only computations.
+- `monomial-computation-state.ts`: owns validation and cached aligned input for optional monomial-only computations.
 - `computation-controller.ts`: calls backend lazy sequences and converts finite requested ranges into output items.
 - `info-panel.ts`: renders current status and selected-item details only.
 - `output-panel.ts`: renders translator output, optional computation controls, and ambiguity/Bardzell/cohomology/cup-product output sections.

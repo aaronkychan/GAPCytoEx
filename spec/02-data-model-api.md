@@ -31,26 +31,37 @@ interface Path {
   orientation: PathOrientation;
 }
 
-interface MonomialRelation {
+interface RelationGenerator {
   id: string;
-  path: Path; // active display/input convention
-  pathL2R: Path;
-  pathR2L: Path;
+  path: Path; // canonical L2R traversal path
 }
 
 interface MonomialAlgebraInput {
   quiver: Quiver;
-  relations: MonomialRelation[];
+  relations: RelationGenerator[];
   activeOrientation: PathOrientation;
   maxPathLength: number;
 }
 
-interface NormalizedMonomialAlgebra {
+interface Monomial {
+  scalar?: string;
+  monomial: ArrowId[];
+}
+
+interface RelationData {
+  id?: string;
+  reln?: string;
+  fieldChar?: number;
+  terms?: Monomial[];
+}
+
+interface VerifiedMonomialAlgebra {
   quiver: Quiver;
-  relationsL2R: MonomialRelation[];
-  relationsR2L: MonomialRelation[];
+  originalRelations: RelationGenerator[];
+  minimisedRelations: RelationGenerator[];
   activeOrientation: PathOrientation;
   maxPathLength: number;
+  logs: MonomialAlgebraLogEntry[];
 }
 ```
 
@@ -63,9 +74,9 @@ Path rules:
 - Every listed relation path must have length at least 2.
 - Every listed relation path must be composable in the quiver when read as its `L2R` traversal copy.
 - Monomial relations are single paths only; linear combinations are out of scope for this TypeScript backend.
-- The backend must keep both orientation copies of every relation path: `pathL2R` and `pathR2L`.
+- The backend stores one canonical relation path in `L2R` traversal order.
 - The UI may display either convention. Changing the convention changes path display and relation-row text, not the underlying quiver.
-- GAP/QPA compatibility remains `L2R` only. Any GAP/QPA export or comparison path must use `pathL2R`.
+- GAP/QPA compatibility remains `L2R` only. Any GAP/QPA export or comparison path must use the stored canonical relation path.
 
 Orientation helper:
 
@@ -74,10 +85,10 @@ function reverseOrientation(path: Path): Path;
 
 function reverseOrientationOfAmbiguity(ambiguity: Ambiguity): Ambiguity;
 
-function normalizeOrientedInput(input: MonomialAlgebraInput): NormalizedMonomialAlgebra;
+function tidyUpMonomialAlgebra(input: MonomialAlgebraInput): VerifiedMonomialAlgebra;
 ```
 
-`reverseOrientation` switches between `L2R` and `R2L` path-word conventions by reversing `path.arrows` and toggling `path.orientation`. It must preserve the mathematical path's `source` and `target`; it does not reverse quiver arrows. `normalizeOrientedInput` validates relation composability on the `L2R` traversal copy, then stores both `relationsL2R` and `relationsR2L` before any ambiguity, Bardzell, cohomology, or cup-product computation runs.
+`reverseOrientation` switches between `L2R` and `R2L` path-word conventions by reversing `path.arrows` and toggling `path.orientation`. It must preserve the mathematical path's `source` and `target`; it does not reverse quiver arrows. `tidyUpMonomialAlgebra` validates relation composability on the stored `L2R` traversal path, keeps `originalRelations`, and stores `minimisedRelations` before any ambiguity, Bardzell, cohomology, or cup-product computation runs. Callers derive `R2L` words with `reverseOrientation` when they need paper-order display or computation.
 
 `reverseOrientationOfAmbiguity` switches between the equivalent `R2L` left-ambiguity and `L2R` right-ambiguity forms. It must reverse the order of the ambiguity pieces and apply `reverseOrientation` to each nontrivial piece, while preserving the mathematical underlying path.
 
@@ -110,7 +121,7 @@ The backend supports two equivalent ambiguity conventions during development:
 u_{-1} | u_0 | ... | u_n
 ```
 
-Here `u_{-1}` is the length-zero vertex path on the left in paper order.
+Here `u_{-1}` is the target vertex path on the left in paper order.
 
 2. Cross-check computation: **right ambiguities in `L2R` convention**, matching frontend traversal order.
 
@@ -118,15 +129,15 @@ Here `u_{-1}` is the length-zero vertex path on the left in paper order.
 u_n | u_{n-1} | ... | u_0 | u_{-1}
 ```
 
-Here `u_{-1}` is the length-zero vertex path on the right.
+Here `u_{-1}` is the target vertex path on the right.
 
 The helper `underlyingPathOfAmbiguity` concatenates the pieces in their stored word convention and returns a `Path` with the same `orientation` and mathematical `source`/`target` as the ambiguity.
 
 Conventions:
 
 - `Gamma[-1]` entries have `pieces = [vertexPath]`, where `vertexPath` has length zero.
-- For `R2L` left ambiguities, `Gamma[0]` entries have `pieces = [sourceVertexPath, arrowPathR2L]`, and `Gamma[1]` relation `r = a_m ... a_1` is stored as `[sourceVertexPath, a_m, a_{m-1} ... a_1]` in `R2L` word order.
-- For `L2R` right ambiguities, `Gamma[0]` entries have `pieces = [arrowPathL2R, targetVertexPath]`, and `Gamma[1]` relation `r = a_1 ... a_m` is stored as `[a_1 ... a_{m-1}, a_m, targetVertexPath]` in `L2R` word order.
+- For `R2L` left ambiguities, `Gamma[0]` entries have `pieces = [targetVertexPath, arrowPathR2L]`, and `Gamma[1]` relation `r = a_m ... a_1` is stored as `[targetVertexPath, relationPathR2L]` in `R2L` word order.
+- For `L2R` right ambiguities, `Gamma[0]` entries have `pieces = [arrowPathL2R, targetVertexPath]`, and `Gamma[1]` relation `r = a_1 ... a_m` is stored as `[relationPathL2R, targetVertexPath]` in `L2R` word order.
 - If the minimal relation set is empty, then `Gamma[1]` is empty and `Gamma[n]` is empty for every `n >= 1`.
 - For `n >= 2`, `pieces` is the inductively constructed ambiguity decomposition in its declared `orientation` and `kind`.
 - Deduplication is by `underlyingPathOfAmbiguity(ambiguity)`, but UI display and differential logic must retain `pieces`.
@@ -169,9 +180,9 @@ interface HochschildCohomology {
   groups: LazySequence<CohomologyGroup>;
 }
 
-function computeLeftAmbiguitiesR2L(input: NormalizedMonomialAlgebra): AmbiguitySequence;
+function computeLeftAmbiguitiesR2L(input: VerifiedMonomialAlgebra): AmbiguitySequence;
 
-function computeRightAmbiguitiesL2R(input: NormalizedMonomialAlgebra): AmbiguitySequence;
+function computeRightAmbiguitiesL2R(input: VerifiedMonomialAlgebra): AmbiguitySequence;
 
 function computeAmbiguities(input: MonomialAlgebraInput): AmbiguityComputation;
 

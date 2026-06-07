@@ -1,6 +1,7 @@
 import type { PathOrientation } from "../backend/paths";
-import { DEFAULT_MAX_PATH_LENGTH, MIN_MAX_PATH_LENGTH, type MonomialRelation } from "../backend/monomial-algebra";
+import { DEFAULT_MAX_PATH_LENGTH, MIN_MAX_PATH_LENGTH } from "../backend/monomial-algebra";
 import type { Quiver } from "../backend/quiver";
+import type { RelationGenerator } from "../backend/relations";
 
 export interface OrientationState {
   active: PathOrientation;
@@ -10,7 +11,7 @@ export interface FrontendState {
   orientation: OrientationState;
   maxPathLength: number;
   quiver: Quiver;
-  relations: MonomialRelation[];
+  relations: RelationGenerator[];
   selectedRelationId: string | null;
   infoMessage: string;
   outputText: string;

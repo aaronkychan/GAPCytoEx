@@ -8,7 +8,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/cytoscape-svg@0.4.0/cytoscape-svg.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-    <script src="../legacy/GAPToCyto/GAPToCyto.js" defer></script>
     <script src="./assets/app.js" defer></script>
   </head>
 
@@ -23,6 +22,7 @@
         </div>
         <div class="header-actions">
           <div class="global-orientation" aria-label="Path display convention">
+            <span id="field-characteristic" class="field-characteristic">Characteristic 0 (real)</span>
             <span id="relation-orientation">Path orientation</span>
             <div class="segmented">
               <button type="button" data-orientation="L2R" aria-pressed="true">Left-to-right</button>
@@ -49,7 +49,6 @@
                 <input type="checkbox" id="forceArrow" value="" />
                 Force arrows to be labelled by alphabets
               </label>
-              <span id="controlOutput" class="status-text"></span>
             </div>
 
             <div id="divInputQuiver" class="field-block">
@@ -58,7 +57,7 @@
                   <div class="field-label">QPA quiver with relations</div>
                   <div class="field-note">Relations detected here override the relation array.</div>
                 </div>
-                <input type="button" value="Clear quiver" onclick="document.getElementById('inQuiver').value = ''" />
+                <input type="button" id="clearQuiverInput" value="Clear quiver" />
               </div>
               <textarea
                 id="inQuiver"
@@ -76,7 +75,7 @@
                   <div class="field-label">Relation array</div>
                   <div class="field-note">Optional fallback input.</div>
                 </div>
-                <input type="button" value="Clear relations" onclick="document.getElementById('inRelation').value = ''" />
+                <input type="button" id="clearRelationInput" value="Clear relations" />
               </div>
               <textarea id="inRelation" value="" cols="10" rows="4" placeholder="[a*b,...]"></textarea>
             </div>
@@ -120,17 +119,22 @@
             </div>
 
             <div class="utility-column" aria-label="Canvas and file controls">
+              <details open>
+                <summary>Bend arrow</summary>
+                <div class="control-stack">
+                  <div class="button-row">
+                    <input type="button" id="bendLeft" value="Bend Left" />
+                    <input type="button" id="bendRight" value="Bend Right" />
+                  </div>
+                </div>
+              </details>
+
               <details>
                 <summary>Canvas</summary>
                 <div class="control-stack">
-                  <input type="button" value="Reset canvas + relations" onclick="clearAll()" />
+                  <input type="button" id="resetCanvasRelations" value="Reset canvas + relations" />
                   <input type="button" id="fixCyto" value="Fit canvas" disabled />
                   <input type="button" id="wriggle" value="Wriggle graph" disabled />
-                  <span class="field-note">Select arrow to bend:</span>
-                  <div class="button-row">
-                    <input type="button" id="bendLeft" value="Left" />
-                    <input type="button" id="bendRight" value="Right" />
-                  </div>
                 </div>
               </details>
 
@@ -179,7 +183,7 @@
               </div>
               <div class="output-actions">
                 <button id="toQPABtn" disabled>Translate to QPA</button>
-                <input type="button" value="Clear" onclick="document.getElementById('outTxtBox').innerHTML = ''" />
+                <input type="button" id="clearOutput" value="Clear" />
               </div>
             </div>
             <div id="outTxtBox"></div>
@@ -214,9 +218,6 @@
               </div>
             </section>
           </section>
-        </div>
-        <div id="outputDiv" hidden>
-          <div id="legacy-output-placeholder"></div>
         </div>
       </fieldset>
 

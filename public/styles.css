@@ -1092,9 +1092,19 @@ input[type="button"]:hover:not(:disabled) {
 /* User-requested control placement and compactness fixes. */
 .global-orientation {
   display: grid;
+  grid-template-columns: auto auto;
   gap: 0.32rem;
+  align-items: center;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.field-characteristic {
+  white-space: nowrap;
+}
+
+.global-orientation .segmented {
+  grid-column: 1 / -1;
 }
 
 .global-orientation .segmented button {

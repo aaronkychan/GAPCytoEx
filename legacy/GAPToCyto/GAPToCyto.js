@@ -12,6 +12,7 @@ let autoNameVertexCounter = 0;
 let autoNameArrowCounter = 1;
 let animationTimer = null;
 let activePathOrientation = "L2R";
+let activeFieldCharacteristic = 0;
 
 function infLetters(i) {
     // i=0,...,51 gives alphabet, othersie alphabet-with-hat
@@ -31,6 +32,31 @@ const pa = (msg) => {
     document.getElementById("outTxtBox").innerHTML =
         `<span style='color:red; font-size: 20pt'>${msg}</span>`;
 };
+
+function appendInfoLog(message) {
+    const log = document.getElementById("outTxtBox");
+    if (!log) return;
+    const line = document.createElement("div");
+    line.textContent = message;
+    log.appendChild(line);
+}
+
+function characteristicText(characteristic) {
+    return characteristic === 0
+        ? "Characteristic 0 (real)"
+        : `Characteristic ${characteristic}`;
+}
+
+function setFieldCharacteristic(characteristic, shouldLog = false) {
+    activeFieldCharacteristic = characteristic || 0;
+    const display = document.getElementById("field-characteristic");
+    if (display) {
+        display.textContent = characteristicText(activeFieldCharacteristic);
+    }
+    if (shouldLog) {
+        appendInfoLog(`${characteristicText(activeFieldCharacteristic)}.`);
+    }
+}
 
 const stripLineBreaksAndSpaces = (str) =>
     str.replace(/(\\\r\n|\\\r|\\\n)/, "").replace(/\s+/g, "");
@@ -294,13 +320,10 @@ function QPARelationToRelationData(relInputStr, generatorReference, fieldChar) {
             throw new Error("Invalid format in a term of relation");
         }
 
-        if (fieldChar == -1) {
+        if (relData.fieldChar == -1) {
             // try to find characteristic if not yet known
             relData.fieldChar = findFieldChar(scalarRaw);
-            document.getElementById("controlOutput").innerHTML =
-                `Detected characteristic as ${
-                    relData.fieldChar != -1 ? relData.fieldChar : "unknown"
-                }.`;
+            setFieldCharacteristic(relData.fieldChar, true);
         }
 
         // translate scalar string to more readable form if possible
@@ -416,10 +439,6 @@ function transalteQPARelation(relationStr, quiver, updateRelationInput = true) {
         //     if (charFound == -1) {
         //         // try to find characteristic if not yet known
         //         charFound = findFieldChar(scalar);
-        //         document.getElementById("controlOutput").innerHTML =
-        //             `Detected characteristic as ${
-        //                 charFound != -1 ? charFound : "unknown"
-        //             }.`;
         //     }
         //     // translate scalar string to more readable form if possible
         //     scalar = translateScalar(scalar, charFound);
@@ -458,6 +477,9 @@ function transalteQPARelation(relationStr, quiver, updateRelationInput = true) {
         charFound = charFound == -1 ? relobj.fieldChar : charFound;
     }
     relData.sort(monomialWithPositiveCoeffFirst);
+    if (charFound == -1) {
+        setFieldCharacteristic(0, false);
+    }
 
     return relData;
 }

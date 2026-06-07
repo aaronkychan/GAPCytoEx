@@ -1,8 +1,7 @@
 # GAPCytoEx
 
-GAPCytoEx is a TypeScript/Bun extension of the original `GAPToCyto`
-translator for working with quivers, QPA/GAP input, Cytoscape displays, and
-monomial algebra computations.
+GAPCytoEx is an extension of the original `GAPToCyto`
+(translating QPA/GAP code to/from Cytoscape displays for quivers-with-relations) to calculation with monomial algebras.
 
 The first goal is to keep the existing QPA/GAP `<->` Cytoscape translation
 workflow intact while adding a staged interface for computing and visualising
@@ -23,6 +22,6 @@ bun run build
 bun run dev
 ```
 
-The TypeScript specification is split under `spec/`, starting with
-`spec/MonomialHH-TypeScript-Spec.md`. Current progress is tracked in
-`implementation-status.md`.
+For the full specification of the project, see `spec/MonomialHH-TypeScript-Spec.md`,
+the other files in the `spec/` folders are the split version of the full spec.
+Current progress is tracked in `implementation-status.md`.

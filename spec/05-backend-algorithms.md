@@ -1,34 +1,42 @@
 ## Backend Algorithms
 
-### 0. Normalize Path Orientation
+### 0. Align Path Orientation
 
-Before ambiguity, Bardzell, cohomology, or cup-product computation, normalize the path orientation data.
+Before ambiguity, Bardzell, cohomology, or cup-product computation, align the path orientation data.
 
 Rules:
 
 - The user may choose the displayed path convention: `L2R` or `R2L`.
 - `L2R` is the frontend/Cytoscape traversal convention and the only convention used for GAP/QPA import/export compatibility.
 - `R2L` is the paper convention and is the primary backend convention for ambiguity computation.
-- Every monomial relation must have both copies in backend state:
-  - `pathL2R`: arrow word in Cytoscape traversal order;
-  - `pathR2L`: arrow word in paper right-to-left order.
-- If the user chooses `R2L`, relation rows, ambiguity rows, and path displays should use `pathR2L`; the quiver itself is not changed.
+- Every monomial relation stores one canonical `L2R` traversal path in backend state.
+- If the user chooses `R2L`, relation rows, ambiguity rows, and path displays should derive paper-order words with `reverseOrientation`; the quiver itself is not changed.
 - `reverseOrientation(path)` must be the only helper that switches a path between `L2R` and `R2L` word order.
 - `reverseOrientation` reverses only the stored arrow-word order and toggles the `orientation`; it preserves the mathematical path's `source` and `target` and does not reverse arrow directions.
-- `normalizeOrientedInput(input)` validates relation composability using the `L2R` copy, then produces `relationsL2R` and `relationsR2L`.
+- `tidyUpMonomialAlgebra(input)` validates relation composability using the stored `L2R` path, keeps `originalRelations`, and produces `minimisedRelations`.
 - Invalid or stale relation orientation data must block computation and report a warning in `InfoPanel`.
 
-### 1. Normalize Input
+### 1. Minimise Relation Generators
 
 - Validate unique vertex IDs and arrow IDs.
 - Validate every arrow source/target exists.
 - Allow the relation list to be empty.
 - Validate each listed relation path is composable and has length at least 2.
+- Check the original relation list without changing it: if any linear-combination relation contains a term of length 1, log a warning naming that relation.
 - Remove duplicate relation paths.
 - Replace the relation list by the minimal monomial antichain: discard any relation that properly contains another relation as a divisor.
-- Use orientation-normalized relations from `normalizeOrientedInput(input)`.
-- Use normalized `relationsR2L` to construct the primary `R2L` left-ambiguity `Gamma[1]`.
-- Use normalized `relationsL2R` to construct the development cross-check `L2R` right-ambiguity `Gamma[1]`.
+- Log every relation generator removed while minimising.
+- Use orientation-aligned relations from `tidyUpMonomialAlgebra(input)`.
+- Derive `R2L` words from `minimisedRelations` to construct the primary `R2L` left-ambiguity `Gamma[1]`.
+- Use stored `L2R` words from `minimisedRelations` to construct the development cross-check `L2R` right-ambiguity `Gamma[1]`.
+- For monomial-algebra checking from `RelationData`, first reject and log the count of relations with more than two terms.
+- If a monomial relation consists of a single length-one path `a`, remove arrow `a` from the quiver and remove every relation containing `a` from the relation list.
+- For a binomial `RelationData` relation with a length-one term, treat that term as the redundant arrow and treat the other term's monomial as the replacement path. If both binomial terms have length one, use the first term as the redundant arrow and the second term as the replacement path.
+- Remove the redundant arrow from the quiver, remove the arrow-redundant relation itself, and replace every occurrence of that arrow in the remaining relation paths by the replacement path.
+- Scalars play no role in this monomial-algebra check.
+- After redundant-arrow replacement, remove duplicate relation paths and any relation path that properly contains another relation path as a contiguous divisor.
+- Redundant-arrow elimination is part of checking a `RelationDataAlgebraInput` for monomial algebra computation. Do not apply it for unrelated relation-list inspection.
+- Finally, check again that every remaining relation is monomial. If not, log that the computed list of relations is not monomial and terminate.
 
 ### 2. Enumerate Admissible Paths
 
@@ -36,10 +44,13 @@ The admissible basis `B` consists of all paths that do not contain any minimal r
 
 Algorithm:
 
+- Check that the relation list is monomial.
+- Minimise relation generators internally, log what was removed, and enumerate using the minimised list.
 - Start with length-zero vertex paths and length-one arrow paths.
 - Repeatedly extend admissible paths by one composable arrow.
 - Reject any extension containing a relation divisor.
 - Stop when no admissible extension exists.
+- Only enumerate paths with length no greater than `maxPathLength`.
 - If the user-configurable `maxPathLength` is reached before termination, report that finite-dimensionality was not confirmed.
 
 ### 3. Compute Ambiguities
@@ -52,7 +63,7 @@ The primary backend ambiguity computation uses `R2L` path words and follows the 
 u_{-1} | u_0 | ... | u_n
 ```
 
-where `u_{-1}` is the length-zero vertex path on the left in paper order.
+where `u_{-1}` is the target vertex path on the left in paper order.
 
 The backend also implements the equivalent `L2R` **right ambiguity** construction:
 
@@ -60,7 +71,7 @@ The backend also implements the equivalent `L2R` **right ambiguity** constructio
 u_n | u_{n-1} | ... | u_0 | u_{-1}
 ```
 
-where `u_{-1}` is the length-zero vertex path on the right in traversal order. This second implementation exists as a development cross-check. During the development phase, pressing `Compute ambiguities` computes both versions, applies `reverseOrientationOfAmbiguity` to compare them, and reports a warning in `InfoPanel` and `OutputPanel` if the two lists differ.
+where `u_{-1}` is the target vertex path on the right in traversal order. This second implementation exists as a development cross-check. During the development phase, pressing `Compute ambiguities` computes both versions, applies `reverseOrientationOfAmbiguity` to compare them, and reports a warning in `InfoPanel` and `OutputPanel` if the two lists differ.
 
 Ambiguities are represented by an `AmbiguitySequence`, a memoized lazy sequence indexed by `n >= -1`. Calling `getAt(n)` computes any missing lower degrees required by the induction and then returns `Gamma[n]`. Calling `getArray(-1, N)` is the bounded helper used by the frontend and tests.
 
@@ -80,8 +91,8 @@ Use `underlyingPathOfAmbiguity(ambiguity)` whenever the concatenated path is nee
 Primary `R2L` left-ambiguity base data:
 
 - `Gamma[-1]`: one-piece decompositions containing length-zero vertex paths.
-- `Gamma[0]`: decompositions `[sourceVertexPath, arrowPathR2L]`.
-- `Gamma[1]`: canonical left-ambiguity decompositions of minimal monomial relations in `R2L` convention, not arrow-by-arrow decompositions and not opaque whole-path-only values.
+- `Gamma[0]`: decompositions `[targetVertexPath, arrowPathR2L]`.
+- `Gamma[1]`: decompositions `[targetVertexPath, relationPathR2L]` for minimal monomial relations in `R2L` convention.
 - If `Gamma[1]` is empty, then every `Gamma[n]` for `n >= 1` is empty.
 
 For `n >= 2`, compute the primary `R2L` left-ambiguity `Gamma[n]` inductively from `Gamma[n - 1]`:
@@ -98,10 +109,10 @@ For `n >= 2`, compute the primary `R2L` left-ambiguity `Gamma[n]` inductively fr
 
 Primary `R2L` left-ambiguity implementation logic:
 
-1. Normalize the input relation paths to the minimal monomial antichain `Rmin`.
+1. Minimise the input relation generators to the minimal monomial antichain `Rmin`.
 2. Initialize:
    - `Gamma[-1] = [{ pieces: [vertexPath] }]`;
-   - `Gamma[0] = [{ pieces: [sourceVertexPath, arrowPathR2L] }]`;
+   - `Gamma[0] = [{ pieces: [targetVertexPath, arrowPathR2L] }]`;
    - `Gamma[1] = relationToLeftPiecesR2L(r)` for each `r in RminR2L`.
 3. For every requested `n >= 2`, compute `Gamma[n]` from `Gamma[n - 1]`.
 4. For each previous ambiguity `amb` with pieces `[u_{-1}, u_0, ..., u_{n-1}]`, treat the previous ambiguity as already valid. Do not check the earlier pieces again.
@@ -127,11 +138,11 @@ Development cross-check:
 - Implement `computeRightAmbiguitiesL2R` using the equivalent `L2R` right-ambiguity construction.
 - `L2R` right ambiguities are stored as `u_n | u_{n-1} | ... | u_0 | u_{-1}`.
 - During development, `computeAmbiguities(input)` must:
-  1. call `normalizeOrientedInput(input)`;
+  1. call `tidyUpMonomialAlgebra(input)`;
   2. compute `primaryLeftR2L`;
   3. compute `checkRightL2R`;
   4. map one side through `reverseOrientationOfAmbiguity`;
-  5. compare degree-by-degree after normalizing display-only differences;
+  5. compare degree-by-degree after aligning display-only differences;
   6. emit an `orientation-mismatch` warning if the two lists are not identical.
 - A mismatch warning must appear in both `InfoPanel` and the `OutputPanel` ambiguity section. It must not be hidden in the console.
 - The mismatch warning should include the lowest degree where the two conventions diverge and enough display text to inspect the differing ambiguity rows.
