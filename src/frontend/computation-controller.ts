@@ -6,7 +6,7 @@ import type { PathOrientation } from "../backend/paths";
 import { tidyUpRelationDataAlgebra, MonomialAlgebraError } from "../backend/monomial-algebra";
 import type { Quiver } from "../backend/quiver";
 import { appendOutputHtml, setError, setInfoStatus } from "./log-panel";
-import { formatAmbiguityForDisplay, refreshAmbiguitiesOutput, setRelationPanelTab } from "./relation-ui";
+import { refreshAmbiguitiesOutput, setRelationPanelTab } from "./relation-ui";
 import type { WorkbenchState } from "./workbench-state";
 
 const DEFAULT_COMPUTE_TERM_BOUND = 5;
@@ -58,6 +58,10 @@ function formatOrientation(orientation: PathOrientation): string {
   return orientation === "R2L" ? "right-to-left" : "left-to-right";
 }
 
+function termCountText(maxDegree: number): string {
+  return `${maxDegree} ${maxDegree === 1 ? "term" : "terms"}`;
+}
+
 export function computeAndRenderAmbiguities(state: WorkbenchState): void {
   const quiver = currentQuiver(state);
   if (!quiver) {
@@ -99,12 +103,6 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
     console.time(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
     const computation = computeAmbiguitiesFromVerified(verified, maxDegree);
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
-    const lines: string[] = [];
-
-    lines.push(`<div><strong>Ambiguities (${formatOrientation(state.activePathOrientation)})</strong></div>`);
-    for (const warning of computation.warnings) {
-      lines.push(`<div class="status-warn">${escapeHtml(warning.message)}</div>`);
-    }
     console.time(`${COMPUTATION_LOG_PREFIX} render requested terms`);
     const ambiguityGroupsR2L = getLazySequenceTerms(computation.primaryLeftR2L, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
       degree,
@@ -122,20 +120,16 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
     refreshAmbiguitiesOutput(state);
     setRelationPanelTab(state, "ambiguities");
 
-    const ambiguityGroups = state.ambiguityGroupsByOrientation[state.activePathOrientation];
-    for (const { degree, ambiguities } of ambiguityGroups) {
+    for (const { degree, ambiguities } of state.ambiguityGroupsByOrientation[state.activePathOrientation]) {
       console.log("render term", { degree, ambiguities: ambiguities.length });
-      lines.push(`<div><strong>Gamma[${degree}]</strong> (${ambiguities.length})</div>`);
-      if (ambiguities.length === 0) {
-        lines.push(`<pre class="output-pre">(empty)</pre>`);
-        continue;
-      }
-      lines.push(`<pre class="output-pre">${escapeHtml(ambiguities.map(formatAmbiguityForDisplay).join("\n"))}</pre>`);
     }
-    lines.push(`<div class="field-note">${logOnlyLastTerm ? `Showing Gamma[${maxDegree}] only.` : `Showing Gamma[-1] through Gamma[${maxDegree}].`}</div>`);
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} render requested terms`);
 
-    appendOutputHtml(lines.join(""));
+    const logLines = [`Ambiguities computed up to ${termCountText(maxDegree)}.`];
+    for (const warning of computation.warnings) {
+      logLines.push(warning.message);
+    }
+    appendOutputHtml(logLines.join("<br>"));
     setInfoStatus(computation.warnings.length > 0 ? computation.warnings[0].message : "Ambiguities computed.");
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} total`);
     console.groupEnd();

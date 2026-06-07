@@ -1001,7 +1001,7 @@ input[type="button"]:hover:not(:disabled) {
 
 .relation-tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   border-bottom: 1px solid var(--border);
 }
 
@@ -1087,6 +1087,22 @@ input[type="button"]:hover:not(:disabled) {
 
 .ambiguityRow:hover {
   background: var(--surface-strong);
+}
+
+.ambiguity-piece {
+  border-radius: 3px;
+  padding: 0.04rem 0.16rem;
+}
+
+.ambiguity-piece.is-pair-highlighted {
+  background: var(--accent-soft);
+  color: var(--accent-soft-text);
+}
+
+.ambiguity-piece.is-flow-current {
+  font-weight: 850;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .canvas-panel {

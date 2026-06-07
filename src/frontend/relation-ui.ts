@@ -30,6 +30,50 @@ function ambiguityRowId(degree: number, index: number): string {
   return `ambiguity-${degree}-${index}`;
 }
 
+function ambiguityByIndex(state: WorkbenchState, degree: number, index: number): Ambiguity | null {
+  const groups = state.ambiguityGroupsByOrientation?.[state.activePathOrientation];
+  const group = groups?.find((candidate) => candidate.degree === degree);
+  return group?.ambiguities[index] ?? null;
+}
+
+function resetCanvasEdgeStyles(state: WorkbenchState): void {
+  if (!state.cy) {
+    return;
+  }
+  const colors = cytoThemeColors();
+  for (const edge of state.cy.edges()) {
+    edge.style({
+      width: 2,
+      "line-color": colors.edge,
+      "target-arrow-color": colors.edge,
+      "target-arrow-shape": "triangle"
+    });
+    edge.removeStyle("line-fill line-gradient-stop-colors line-gradient-stop-positions");
+  }
+}
+
+function setAmbiguityPieceClasses(row: Element | null, currentPieceIndex: number, highlightedPieceIndexes: Set<number>): void {
+  row?.querySelectorAll<HTMLElement>(".ambiguity-piece").forEach((piece) => {
+    const pieceIndex = Number(piece.dataset.pieceIndex ?? "-1");
+    piece.classList.toggle("is-pair-highlighted", highlightedPieceIndexes.has(pieceIndex));
+    piece.classList.toggle("is-flow-current", pieceIndex === currentPieceIndex);
+  });
+}
+
+function renderAmbiguityRowContents(row: HTMLElement, ambiguity: Ambiguity): void {
+  row.textContent = "";
+  ambiguity.pieces.forEach((piece, pieceIndex) => {
+    if (pieceIndex > 0) {
+      row.appendChild(document.createTextNode(" | "));
+    }
+    const pieceElement = document.createElement("span");
+    pieceElement.className = "ambiguity-piece";
+    pieceElement.dataset.pieceIndex = String(pieceIndex);
+    pieceElement.textContent = formatAmbiguityPiece(piece);
+    row.appendChild(pieceElement);
+  });
+}
+
 export function setRelationPanelTab(state: WorkbenchState, tab: "relations" | "ambiguities"): void {
   if (tab === "ambiguities" && !state.ambiguityGroupsByOrientation) {
     tab = "relations";
@@ -50,12 +94,11 @@ export function setRelationPanelTab(state: WorkbenchState, tab: "relations" | "a
 }
 
 function refreshRelationPanelTabs(state: WorkbenchState): void {
-  const tabs = document.getElementById("relationPanelTabs");
-  if (!tabs) {
-    return;
-  }
+  const ambiguityButton = document.getElementById("ambiguitiesTabButton");
   const hasAmbiguities = state.ambiguityGroupsByOrientation !== null;
-  tabs.hidden = !hasAmbiguities;
+  if (ambiguityButton) {
+    ambiguityButton.hidden = !hasAmbiguities;
+  }
   setRelationPanelTab(state, hasAmbiguities ? state.relationPanelTab : "relations");
 }
 
@@ -95,7 +138,7 @@ export function refreshAmbiguitiesOutput(state: WorkbenchState): void {
       const row = document.createElement("div");
       row.className = `ambiguityRow ${rowIndex % 2 === 0 ? "row-even" : "row-odd"}`;
       row.dataset.ambiguityId = ambiguityRowId(group.degree, ambiguityIndex);
-      row.textContent = formatAmbiguityForDisplay(ambiguity);
+      renderAmbiguityRowContents(row, ambiguity);
       row.addEventListener("click", () => selectAmbiguity(state, group.degree, ambiguityIndex));
       output.appendChild(row);
       rowIndex += 1;
@@ -111,12 +154,20 @@ function clearAmbiguityResults(state: WorkbenchState): void {
 }
 
 export function selectAmbiguity(state: WorkbenchState, degree: number, index: number): void {
+  const ambiguity = ambiguityByIndex(state, degree, index);
+  if (!ambiguity) {
+    return;
+  }
   state.selectedRelationIndex = -1;
   state.selectedAmbiguityId = ambiguityRowId(degree, index);
   clearRelationAnimation(state);
+  resetCanvasEdgeStyles(state);
   document.querySelectorAll("#relOutput .relationRow").forEach((row) => row.classList.remove("selectedRelationRow"));
   document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
-  document.querySelector(`#ambiguityOutput [data-ambiguity-id="${state.selectedAmbiguityId}"]`)?.classList.add("selectedRelationRow");
+  document.querySelectorAll("#ambiguityOutput .ambiguity-piece").forEach((piece) => piece.classList.remove("is-pair-highlighted", "is-flow-current"));
+  const row = document.querySelector(`#ambiguityOutput [data-ambiguity-id="${state.selectedAmbiguityId}"]`);
+  row?.classList.add("selectedRelationRow");
+  animateAmbiguity(state, ambiguity, row);
 }
 
 export function validateRelationArrowReferences(relations: RelationData[], cyInstance: any): boolean {
@@ -227,6 +278,86 @@ export function clearRelationAnimation(state: WorkbenchState): void {
   state.animationTimer = null;
 }
 
+function animateAmbiguity(state: WorkbenchState, ambiguity: Ambiguity, row: Element | null): void {
+  if (!state.cy) {
+    return;
+  }
+  const nonVertexPieces = ambiguity.pieces
+    .map((piece, pieceIndex) => ({ piece, pieceIndex }))
+    .filter(({ piece }) => piece.arrows.length > 0);
+  if (nonVertexPieces.length < 2) {
+    const onlyPiece = nonVertexPieces[0];
+    setAmbiguityPieceClasses(row, onlyPiece?.pieceIndex ?? -1, new Set(onlyPiece ? [onlyPiece.pieceIndex] : []));
+    return;
+  }
+
+  const color = relationHighlightColor(Math.max(0, ambiguity.n));
+  const flowColor = "#dafd13";
+  const stepsPerArrow = 36;
+  let step = 0;
+  const totalArrows = nonVertexPieces.reduce((sum, { piece }) => sum + piece.arrows.length, 0);
+  const totalSteps = Math.max(1, totalArrows * stepsPerArrow);
+
+  state.animationTimer = setInterval(() => {
+    resetCanvasEdgeStyles(state);
+    const currentArrowOffset = Math.min(totalArrows - 1, Math.floor(step / stepsPerArrow));
+    let consumedArrows = 0;
+    let currentPiecePosition = 0;
+    for (let index = 0; index < nonVertexPieces.length; index += 1) {
+      const pieceLength = nonVertexPieces[index].piece.arrows.length;
+      if (currentArrowOffset < consumedArrows + pieceLength) {
+        currentPiecePosition = index;
+        break;
+      }
+      consumedArrows += pieceLength;
+    }
+
+    const currentPiece = nonVertexPieces[currentPiecePosition];
+    const nextPiece = nonVertexPieces[currentPiecePosition + 1];
+    const highlightedPieceIndexes = new Set<number>([currentPiece.pieceIndex]);
+    if (nextPiece) {
+      highlightedPieceIndexes.add(nextPiece.pieceIndex);
+    }
+    setAmbiguityPieceClasses(row, currentPiece.pieceIndex, highlightedPieceIndexes);
+
+    const highlightedArrows = new Set<string>();
+    for (const { pieceIndex, piece } of nonVertexPieces) {
+      if (highlightedPieceIndexes.has(pieceIndex)) {
+        piece.arrows.forEach((arrow) => highlightedArrows.add(arrow));
+      }
+    }
+    highlightedArrows.forEach((arrow) => {
+      const edge = state.cy.getElementById(arrow);
+      edge.style({
+        width: 3,
+        "line-color": color,
+        "target-arrow-color": color,
+        "target-arrow-shape": "triangle"
+      });
+    });
+
+    const currentPieceLocalArrow = currentArrowOffset - consumedArrows;
+    const currentArrow = currentPiece.piece.arrows[currentPieceLocalArrow];
+    const localProgress = (step % stepsPerArrow) / stepsPerArrow;
+    const center = localProgress * 100;
+    const start = Math.max(0, center - 18);
+    const end = Math.min(100, center + 18);
+    state.cy.getElementById(currentArrow).style({
+      width: 5,
+      "line-fill": "linear-gradient",
+      "line-gradient-stop-colors": `${color} ${color} ${flowColor} ${color} ${color}`,
+      "line-gradient-stop-positions": `0 ${start} ${center} ${end} 100`
+    });
+
+    step += 1;
+    if (step > totalSteps) {
+      clearRelationAnimation(state);
+      resetCanvasEdgeStyles(state);
+      setAmbiguityPieceClasses(row, -1, new Set());
+    }
+  }, 60);
+}
+
 export function selectRelation(state: WorkbenchState, index: number): void {
   state.selectedRelationIndex = index;
   state.selectedAmbiguityId = null;
@@ -236,20 +367,11 @@ export function selectRelation(state: WorkbenchState, index: number): void {
   }
 
   const rows = document.querySelectorAll("#relOutput .relationRow");
-  const colors = cytoThemeColors();
-  for (const edge of state.cy.edges()) {
-    edge.style({
-      width: 2,
-      "line-color": colors.edge,
-      "target-arrow-color": colors.edge,
-      "target-arrow-shape": "triangle",
-      "curve-style": "bezier"
-    });
-    edge.removeStyle("line-fill line-gradient-stop-colors line-gradient-stop-positions");
-  }
+  resetCanvasEdgeStyles(state);
 
   rows.forEach((row) => row.classList.remove("selectedRelationRow"));
   document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguity-piece").forEach((piece) => piece.classList.remove("is-pair-highlighted", "is-flow-current"));
   if (index < 0 || index >= rows.length || index >= state.relations.length) {
     return;
   }
@@ -272,8 +394,7 @@ export function selectRelation(state: WorkbenchState, index: number): void {
     width: 2,
     "line-color": color,
     "target-arrow-color": color,
-    "target-arrow-shape": "triangle",
-    "curve-style": "bezier"
+    "target-arrow-shape": "triangle"
   });
   allEdges.style({
     "line-fill": "linear-gradient",
