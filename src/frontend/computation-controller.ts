@@ -1,15 +1,16 @@
 import {
   computeAmbiguitiesFromVerified,
   getLazySequenceTerms,
-  underlyingPathOfAmbiguity,
   type Ambiguity
 } from "../backend/ambiguities";
+import type { Path, PathOrientation } from "../backend/paths";
 import { tidyUpRelationDataAlgebra, MonomialAlgebraError } from "../backend/monomial-algebra";
 import type { Quiver } from "../backend/quiver";
-import { setError, setInfoStatus, setOutputHtml } from "./log-panel";
+import { appendOutputHtml, setError, setInfoStatus } from "./log-panel";
 import type { WorkbenchState } from "./workbench-state";
 
 const DEFAULT_COMPUTE_TERM_BOUND = 5;
+const COMPUTATION_LOG_PREFIX = "[GAPCytoEx ambiguity]";
 
 function currentQuiver(state: WorkbenchState): Quiver | null {
   if (!state.cy) {
@@ -54,13 +55,22 @@ function escapeHtml(value: string): string {
 }
 
 function formatPathWord(arrows: string[]): string {
-  return arrows.length === 0 ? "e" : arrows.join("·");
+  return arrows.join("·");
+}
+
+function formatOrientation(orientation: PathOrientation): string {
+  return orientation === "R2L" ? "right-to-left" : "left-to-right";
+}
+
+function formatAmbiguityPiece(piece: Path): string {
+  if (piece.arrows.length === 0) {
+    return `(${piece.target})`;
+  }
+  return formatPathWord(piece.arrows);
 }
 
 function formatAmbiguity(ambiguity: Ambiguity): string {
-  const path = underlyingPathOfAmbiguity(ambiguity);
-  const pieces = ambiguity.pieces.map((piece) => formatPathWord(piece.arrows)).join(" | ");
-  return `${pieces}    (${path.source} -> ${path.target}; ${formatPathWord(path.arrows)})`;
+  return ambiguity.pieces.map(formatAmbiguityPiece).join(" | ");
 }
 
 export function computeAndRenderAmbiguities(state: WorkbenchState): void {
@@ -71,24 +81,49 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
   }
 
   try {
+    const maxPathLength = maxPathLengthValue();
+    const maxDegree = computeTermBoundValue();
+    const logOnlyLastTerm = logOnlyLastTermValue();
+    console.groupCollapsed(`${COMPUTATION_LOG_PREFIX} compute button`);
+    console.log("input", {
+      vertices: quiver.vertices.length,
+      arrows: quiver.arrows.length,
+      relations: state.relations.length,
+      activeOrientation: formatOrientation(state.activePathOrientation),
+      maxPathLength,
+      maxDegree,
+      logOnlyLastTerm
+    });
+    console.time(`${COMPUTATION_LOG_PREFIX} total`);
+    console.time(`${COMPUTATION_LOG_PREFIX} tidy algebra`);
     const verified = tidyUpRelationDataAlgebra({
       quiver,
       relations: state.relations,
       activeOrientation: state.activePathOrientation,
-      maxPathLength: maxPathLengthValue(),
+      maxPathLength,
       fieldCharacteristic: state.activeFieldCharacteristic
     });
-    const computation = computeAmbiguitiesFromVerified(verified);
+    console.timeEnd(`${COMPUTATION_LOG_PREFIX} tidy algebra`);
+    console.log("verified algebra", {
+      arrows: verified.quiver.arrows.length,
+      originalRelations: verified.originalRelations.length,
+      minimisedRelations: verified.minimisedRelations.length,
+      maxPathLength: verified.maxPathLength,
+      logs: verified.logs.map((entry) => entry.message)
+    });
+    console.time(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
+    const computation = computeAmbiguitiesFromVerified(verified, maxDegree);
+    console.timeEnd(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
     const sequence = state.activePathOrientation === "R2L" ? computation.primaryLeftR2L : computation.checkRightL2R;
-    const maxDegree = computeTermBoundValue();
-    const logOnlyLastTerm = logOnlyLastTermValue();
     const lines: string[] = [];
 
-    lines.push(`<div><strong>Ambiguities (${state.activePathOrientation})</strong></div>`);
+    lines.push(`<div><strong>Ambiguities (${formatOrientation(state.activePathOrientation)})</strong></div>`);
     for (const warning of computation.warnings) {
       lines.push(`<div class="status-warn">${escapeHtml(warning.message)}</div>`);
     }
+    console.time(`${COMPUTATION_LOG_PREFIX} render requested terms`);
     for (const [degree, ambiguities] of getLazySequenceTerms(sequence, -1, maxDegree, logOnlyLastTerm)) {
+      console.log("render term", { degree, ambiguities: ambiguities.length });
       lines.push(`<div><strong>Gamma[${degree}]</strong> (${ambiguities.length})</div>`);
       if (ambiguities.length === 0) {
         lines.push(`<pre class="output-pre">(empty)</pre>`);
@@ -97,12 +132,18 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
       lines.push(`<pre class="output-pre">${escapeHtml(ambiguities.map(formatAmbiguity).join("\n"))}</pre>`);
     }
     lines.push(`<div class="field-note">${logOnlyLastTerm ? `Showing Gamma[${maxDegree}] only.` : `Showing Gamma[-1] through Gamma[${maxDegree}].`}</div>`);
+    console.timeEnd(`${COMPUTATION_LOG_PREFIX} render requested terms`);
 
-    setOutputHtml(lines.join(""));
+    appendOutputHtml(lines.join(""));
     setInfoStatus(computation.warnings.length > 0 ? computation.warnings[0].message : "Ambiguities computed.");
+    console.timeEnd(`${COMPUTATION_LOG_PREFIX} total`);
+    console.groupEnd();
   } catch (error) {
+    console.error(`${COMPUTATION_LOG_PREFIX} failed`, error);
+    console.timeEnd(`${COMPUTATION_LOG_PREFIX} total`);
+    console.groupEnd();
     if (error instanceof MonomialAlgebraError) {
-      setOutputHtml(error.logs.map((entry) => `<div class="status-warn">${escapeHtml(entry.message)}</div>`).join(""));
+      appendOutputHtml(error.logs.map((entry) => `<div class="status-warn">${escapeHtml(entry.message)}</div>`).join(""));
       setInfoStatus("Ambiguity computation blocked: relations are not monomial.", true);
       return;
     }

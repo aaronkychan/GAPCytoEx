@@ -41,6 +41,48 @@ export interface AmbiguityComputation {
   warnings: AmbiguityComparisonWarning[];
 }
 
+const AMBIGUITY_LOG_PREFIX = "[GAPCytoEx ambiguity]";
+const SHOULD_LOG_AMBIGUITIES = typeof window !== "undefined";
+
+function ambiguityLog(message: string, details?: unknown): void {
+  if (!SHOULD_LOG_AMBIGUITIES) {
+    return;
+  }
+  if (details === undefined) {
+    console.log(message);
+    return;
+  }
+  console.log(message, details);
+}
+
+function ambiguityTime(label: string): void {
+  if (SHOULD_LOG_AMBIGUITIES) {
+    console.time(label);
+  }
+}
+
+function ambiguityTimeEnd(label: string): void {
+  if (SHOULD_LOG_AMBIGUITIES) {
+    console.timeEnd(label);
+  }
+}
+
+function ambiguityGroupCollapsed(label: string): void {
+  if (SHOULD_LOG_AMBIGUITIES) {
+    console.groupCollapsed(label);
+  }
+}
+
+function ambiguityGroupEnd(): void {
+  if (SHOULD_LOG_AMBIGUITIES) {
+    console.groupEnd();
+  }
+}
+
+function formatOrientation(orientation: PathOrientation): string {
+  return orientation === "R2L" ? "right-to-left" : "left-to-right";
+}
+
 export function getLazySequenceTerms<T>(
   sequence: LazySequence<T>,
   start: number,
@@ -121,7 +163,7 @@ function ambiguityKey(ambiguity: Ambiguity): string {
   return `${path.orientation}:${path.source}:${path.target}:${printArrowWord(path.arrows)}`;
 }
 
-function makeSequence(compute: (index: number) => Ambiguity[]): AmbiguitySequence {
+function makeSequence(label: string, compute: (index: number) => Ambiguity[]): AmbiguitySequence {
   const cache = new Map<number, Ambiguity[]>();
   const sequence: AmbiguitySequence = {
     getAt(index: number): Ambiguity[] {
@@ -129,7 +171,13 @@ function makeSequence(compute: (index: number) => Ambiguity[]): AmbiguitySequenc
         throw new RangeError("Ambiguity degree must be at least -1.");
       }
       if (!cache.has(index)) {
-        cache.set(index, compute(index));
+        ambiguityTime(`${AMBIGUITY_LOG_PREFIX} ${label} Gamma[${index}]`);
+        const value = compute(index);
+        ambiguityTimeEnd(`${AMBIGUITY_LOG_PREFIX} ${label} Gamma[${index}]`);
+        ambiguityLog(`${AMBIGUITY_LOG_PREFIX} ${label} Gamma[${index}]`, {
+          ambiguities: value.length
+        });
+        cache.set(index, value);
       }
       return cache.get(index) ?? [];
     },
@@ -234,6 +282,11 @@ function gammaOneL2R(input: VerifiedMonomialAlgebra): Ambiguity[] {
 function computeNextLeftR2L(input: VerifiedMonomialAlgebra, previous: Ambiguity[], degree: number): Ambiguity[] {
   const relationWords = input.minimisedRelations.map((relation) => [...relation.path.arrows].reverse());
   const candidates: Ambiguity[] = [];
+  ambiguityLog(`${AMBIGUITY_LOG_PREFIX} left R2L extension start`, {
+    degree,
+    previous: previous.length,
+    relations: relationWords.length
+  });
 
   for (const ambiguity of previous) {
     // Spec 05, steps 4-5: extend only the previous rightmost non-vertex piece.
@@ -277,12 +330,23 @@ function computeNextLeftR2L(input: VerifiedMonomialAlgebra, previous: Ambiguity[
     }
   }
 
-  return dedupeAmbiguities(candidates);
+  const deduped = dedupeAmbiguities(candidates);
+  ambiguityLog(`${AMBIGUITY_LOG_PREFIX} left R2L extension end`, {
+    degree,
+    candidates: candidates.length,
+    deduped: deduped.length
+  });
+  return deduped;
 }
 
 function computeNextRightL2R(input: VerifiedMonomialAlgebra, previous: Ambiguity[], degree: number): Ambiguity[] {
   const relationWords = input.minimisedRelations.map((relation) => relation.path.arrows);
   const candidates: Ambiguity[] = [];
+  ambiguityLog(`${AMBIGUITY_LOG_PREFIX} right L2R extension start`, {
+    degree,
+    previous: previous.length,
+    relations: relationWords.length
+  });
 
   for (const ambiguity of previous) {
     // L2R mirror of Spec 05, steps 4-5: extend only the previous leftmost non-vertex piece.
@@ -326,12 +390,18 @@ function computeNextRightL2R(input: VerifiedMonomialAlgebra, previous: Ambiguity
     }
   }
 
-  return dedupeAmbiguities(candidates);
+  const deduped = dedupeAmbiguities(candidates);
+  ambiguityLog(`${AMBIGUITY_LOG_PREFIX} right L2R extension end`, {
+    degree,
+    candidates: candidates.length,
+    deduped: deduped.length
+  });
+  return deduped;
 }
 
 export function computeLeftAmbiguitiesR2L(input: VerifiedMonomialAlgebra): AmbiguitySequence {
   let sequence: AmbiguitySequence;
-  sequence = makeSequence((index) => {
+  sequence = makeSequence("left R2L", (index) => {
     if (index === -1) {
       return gammaMinusOne(input.quiver, "R2L", "left");
     }
@@ -352,7 +422,7 @@ export function computeLeftAmbiguitiesR2L(input: VerifiedMonomialAlgebra): Ambig
 
 export function computeRightAmbiguitiesL2R(input: VerifiedMonomialAlgebra): AmbiguitySequence {
   let sequence: AmbiguitySequence;
-  sequence = makeSequence((index) => {
+  sequence = makeSequence("right L2R", (index) => {
     if (index === -1) {
       return gammaMinusOne(input.quiver, "L2R", "right");
     }
@@ -382,25 +452,44 @@ function equivalentAmbiguityLists(leftR2L: Ambiguity[], rightL2R: Ambiguity[]): 
   return wordsEqual(leftKeys, rightKeys);
 }
 
-export function computeAmbiguitiesFromVerified(verified: VerifiedMonomialAlgebra): AmbiguityComputation {
+export function computeAmbiguitiesFromVerified(
+  verified: VerifiedMonomialAlgebra,
+  comparisonMaxDegree = verified.maxPathLength
+): AmbiguityComputation {
+  const checkedComparisonMaxDegree = Math.max(-1, Math.floor(comparisonMaxDegree));
+  ambiguityGroupCollapsed(`${AMBIGUITY_LOG_PREFIX} orientation cross-check`);
+  ambiguityLog("cross-check input", {
+    arrows: verified.quiver.arrows.length,
+    minimisedRelations: verified.minimisedRelations.length,
+    maxPathLength: verified.maxPathLength,
+    comparisonMaxDegree: checkedComparisonMaxDegree
+  });
   const primaryLeftR2L = computeLeftAmbiguitiesR2L(verified);
   const checkRightL2R = computeRightAmbiguitiesL2R(verified);
   const warnings: AmbiguityComparisonWarning[] = [];
 
-  for (let degree = -1; degree <= verified.maxPathLength; degree += 1) {
+  for (let degree = -1; degree <= checkedComparisonMaxDegree; degree += 1) {
+    ambiguityTime(`${AMBIGUITY_LOG_PREFIX} compare Gamma[${degree}]`);
     const left = primaryLeftR2L.getAt(degree);
     const right = checkRightL2R.getAt(degree);
+    ambiguityTimeEnd(`${AMBIGUITY_LOG_PREFIX} compare Gamma[${degree}]`);
+    ambiguityLog(`${AMBIGUITY_LOG_PREFIX} compare Gamma[${degree}]`, {
+      leftR2L: left.length,
+      rightL2R: right.length
+    });
     if (!equivalentAmbiguityLists(left, right)) {
       warnings.push({
         kind: "orientation-mismatch",
         degree,
-        message: `R2L left ambiguities and L2R right ambiguities differ in degree ${degree}.`,
+        message: `${formatOrientation("R2L")} left ambiguities and ${formatOrientation("L2R")} right ambiguities differ in degree ${degree}.`,
         leftR2L: left,
         rightL2R: right
       });
       break;
     }
   }
+  ambiguityLog("cross-check warnings", warnings.length);
+  ambiguityGroupEnd();
 
   return {
     primaryLeftR2L,
@@ -409,6 +498,9 @@ export function computeAmbiguitiesFromVerified(verified: VerifiedMonomialAlgebra
   };
 }
 
-export function computeAmbiguities(input: MonomialAlgebraInput): AmbiguityComputation {
-  return computeAmbiguitiesFromVerified(tidyUpMonomialAlgebra(input));
+export function computeAmbiguities(
+  input: MonomialAlgebraInput,
+  comparisonMaxDegree?: number
+): AmbiguityComputation {
+  return computeAmbiguitiesFromVerified(tidyUpMonomialAlgebra(input), comparisonMaxDegree);
 }

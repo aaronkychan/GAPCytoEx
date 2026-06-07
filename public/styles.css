@@ -794,9 +794,11 @@ textarea {
   display: grid;
   --info-width: 380px;
   grid-template-columns: minmax(0, 1fr) 12px minmax(300px, var(--info-width));
+  grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
     "controls splitter output"
     "canvas splitter output";
+  height: calc(100vh - 150px);
   min-height: 720px;
   background: var(--surface);
 }
@@ -876,9 +878,11 @@ input[type="button"]:hover:not(:disabled) {
   grid-template-rows: auto auto minmax(130px, 1fr) auto auto;
   gap: 0.55rem;
   min-width: 0;
+  min-height: 0;
   border-left: 1px solid var(--border);
   background: var(--surface-muted);
   padding: 0.75rem;
+  overflow: hidden;
 }
 
 .workbench-splitter {
@@ -928,6 +932,7 @@ input[type="button"]:hover:not(:disabled) {
   max-height: none;
   border-radius: 4px;
   background: var(--surface);
+  overflow: auto;
 }
 
 .monomial-controls {
@@ -951,7 +956,7 @@ input[type="button"]:hover:not(:disabled) {
   display: grid;
   --relation-width: 280px;
   grid-template-columns: minmax(190px, var(--relation-width)) 12px minmax(0, 1fr);
-  min-height: 580px;
+  min-height: 0;
   min-width: 0;
 }
 
@@ -959,6 +964,8 @@ input[type="button"]:hover:not(:disabled) {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   border-right: 1px solid var(--border);
   background: var(--surface-muted);
 }
@@ -1000,6 +1007,7 @@ input[type="button"]:hover:not(:disabled) {
   border-radius: 0;
   resize: none;
   background: var(--surface);
+  overflow: auto;
 }
 
 .canvas-panel {
@@ -1210,6 +1218,7 @@ input[type="button"]:hover:not(:disabled) {
 
 #outTxtBox {
   min-height: 220px;
+  overflow: auto;
 }
 
 .output-pre {

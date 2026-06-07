@@ -5,6 +5,16 @@ export function setOutputHtml(html: string): void {
   }
 }
 
+export function appendOutputHtml(html: string): void {
+  const output = document.getElementById("outTxtBox");
+  if (!output) {
+    return;
+  }
+  const entry = document.createElement("div");
+  entry.innerHTML = html;
+  output.appendChild(entry);
+}
+
 export function setError(message: string): void {
   setOutputHtml(`<span style='color:red; font-size: 20pt'>${message}</span>`);
 }
