@@ -1057,7 +1057,11 @@ function clickOnCanvas(event, cyInstance, state) {
     if (target === cyInstance) {
       const name = promptNameAndCheck("Enter name for new vertex:", cyInstance, "vertex", state);
       if (name) {
-        cyInstance.add({ group: "nodes", data: { id: name }, position: event.position });
+        cyInstance.add({
+          group: "nodes",
+          data: { id: name },
+          position: event.position
+        });
       }
     } else if (target.isNode()) {
       if (state.addingArrow) {
@@ -1065,7 +1069,12 @@ function clickOnCanvas(event, cyInstance, state) {
         if (name) {
           cyInstance.add({
             group: "edges",
-            data: { id: name, source: state.sourceNodeId, target: target.id(), label: name }
+            data: {
+              id: name,
+              source: state.sourceNodeId,
+              target: target.id(),
+              label: name
+            }
           });
           state.addingArrow = false;
           state.sourceNodeId = null;
@@ -1126,7 +1135,12 @@ function clickOnCanvas(event, cyInstance, state) {
   }
 }
 function initCytoscape(state, inputData, isPreset = false) {
-  const layout = isPreset ? { name: "preset", fit: false } : { name: "breadthfirst", fit: true, padding: 20, nodeDimensionsIncludeLabels: true };
+  const layout = isPreset ? { name: "preset", fit: false } : {
+    name: "breadthfirst",
+    fit: true,
+    padding: 20,
+    nodeDimensionsIncludeLabels: true
+  };
   const cyInstance = cytoscape({
     container: document.getElementById("cy"),
     elements: inputData,
@@ -1219,9 +1233,12 @@ function doubleQuiver(state) {
     state.relationPanelTab = "relations";
     refreshRelationsOutput(state);
     state.cy.add(reverseArrows);
-    state.cy.layout({ name: "cose", animate: true, animationDuration: 800, randomize: false, nodeDimensionsIncludeLabels: true }).run();
+    state.cy.forceRender();
   }
-  setOutputHtml([`Added ${reverseArrows.length} reverse arrow(s).`, skipped.length > 0 ? `Skipped existing reverse arrow(s): ${skipped.join(", ")}` : ""].filter(Boolean).join("<br>"));
+  setOutputHtml([
+    `Added ${reverseArrows.length} reverse arrow(s).`,
+    skipped.length > 0 ? `Skipped existing reverse arrow(s): ${skipped.join(", ")}` : ""
+  ].filter(Boolean).join("<br>"));
 }
 function clearAll(state) {
   state.addRelationMode = false;
@@ -1255,7 +1272,11 @@ function createInitialVertexAtClick(state, event) {
   if (!name) {
     return;
   }
-  const element = { group: "nodes", data: { id: name }, position: { x: event.offsetX - 40, y: event.offsetY - 40 } };
+  const element = {
+    group: "nodes",
+    data: { id: name },
+    position: { x: event.offsetX - 40, y: event.offsetY - 40 }
+  };
   state.quiverData = { nodes: [element], edges: [] };
   state.cy = initCytoscape(state, state.quiverData, true);
   ["toQPABtn", "fixCyto", "wriggle", "saveSVG"].forEach((id) => {
@@ -2540,5 +2561,5 @@ maxPathLength?.addEventListener("input", () => {
 });
 bindWorkbenchEvents(state);
 
-//# debugId=9F692C998614C71B64756E2164756E21
+//# debugId=6D5CA7BDA7FD8C2364756E2164756E21
 //# sourceMappingURL=app.js.map
