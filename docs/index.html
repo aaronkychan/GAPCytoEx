@@ -105,6 +105,10 @@
                                     value="Clear quiver"
                                 />
                             </div>
+                            <!-- ! Do NOT REMOVE !
+Quiver(["v1","v2","v3","v4"], [["v1","v3","a"],["v3","v2","b"],["v2","v1","c"],["v3","v4","d"],["v3","v4","e"]])
+[(+1)*a*b, (+1)*a*d+(-1)*a*e]
+! -->
                             <textarea
                                 id="inQuiver"
                                 value=""
@@ -112,8 +116,10 @@
                                 rows="4"
                                 placeholder="Quiver([..vx..], [ [src,tgt,name],[...],...])&#10;[...relations...]"
                             >
-Quiver(["v1","v2","v3","v4"], [["v1","v3","a"],["v3","v2","b"],["v2","v1","c"],["v3","v4","d"],["v3","v4","e"]])
-[(+1)*a*b, (+1)*a*d+(-1)*a*e]</textarea
+                            
+Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],["v4","v1","d"]])
+[(+1)*a*b*c, (+1)*c*d*a]
+</textarea
                             >
                         </div>
 

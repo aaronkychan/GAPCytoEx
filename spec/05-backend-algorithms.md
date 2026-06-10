@@ -79,14 +79,16 @@ Store each ambiguity by its path-piece decomposition:
 
 ```ts
 interface Ambiguity {
-  n: number;
-  pieces: Path[];
-  orientation: PathOrientation;
-  kind: AmbiguityKind;
+    n: number;
+    pieces: Path[];
+    orientation: PathOrientation;
+    kind: AmbiguityKind;
 }
 ```
 
 Use `underlyingPathOfAmbiguity(ambiguity)` whenever the concatenated path is needed.
+
+==WARNING: original paper, which uses `R2L` uses "`a` is prefix of `p` if `p=qa`"; in the `R2L` convention, the following doc uses prefix in the literal sense, i.e. `a` is a prefix of `p` if `p=aq`. Likewise for suffix!!==
 
 Primary `R2L` left-ambiguity base data:
 
@@ -99,11 +101,11 @@ For `n >= 2`, compute the primary `R2L` left-ambiguity `Gamma[n]` inductively fr
 
 - assume the previous left-ambiguity decomposition `u_{-1} | u_0 | ... | u_{n-1}` is already valid by induction;
 - do not rescan or revalidate the whole underlying path from the beginning;
-- test only new paths `u_n` for which the adjacent pair `u_{n-1}u_n` is exactly a minimal relation generator;
-- for a candidate minimal relation `r`, the previous piece `u_{n-1}` must be a proper prefix of `r`;
-- append only the remaining suffix of `r`;
-- reject the candidate if any strict suffix of `u_{n-1}u_n` is itself a minimal relation generator;
-- split the right-appended part so `u_{n-1}` grows by all but its rightmost arrow, and that rightmost arrow becomes `u_n`;
+- test only new paths `u_n` for which the adjacent pair `u_{n-1}u_n` ~~is exactly a minimal relation generator~~ ==Correction: is equal to `pr` where `r` is a relation and `p` a path;==
+- ~~for a candidate minimal relation `r`, the previous piece `u_{n-1}` must be a proper prefix of `r`;~~ (this is completely wrong)
+- ~~append only the remaining suffix of `r`;~~ (no, `u_n` is either a suffix of a relation path or has a relation path as suffix; where suffix is in the usual literal sense, not the sense of the original paper)
+- reject the candidate if any strict ~~suffix~~ ==Correction: prefix (in the literal sense)== of `u_{n-1}u_n` is itself a minimal relation generator;
+- ~~split the right-appended part so `u_{n-1}` grows by all but its rightmost arrow, and that rightmost arrow becomes `u_n`;~~ (this is nonsense?)
 - do not extend by arbitrary admissible paths;
 - deduplicate by the full path word returned by `underlyingPathOfAmbiguity`.
 
@@ -111,36 +113,34 @@ Primary `R2L` left-ambiguity implementation logic:
 
 1. Minimise the input relation generators to the minimal monomial antichain `Rmin`.
 2. Initialize:
-   - `Gamma[-1] = [{ pieces: [vertexPath] }]`;
-   - `Gamma[0] = [{ pieces: [targetVertexPath, arrowPathR2L] }]`;
-   - `Gamma[1] = relationToLeftPiecesR2L(r)` for each `r in RminR2L`.
+    - `Gamma[-1] = [{ pieces: [vertexPath] }]`;
+    - `Gamma[0] = [{ pieces: [targetVertexPath, arrowPathR2L] }]`;
+    - `Gamma[1] = relationToLeftPiecesR2L(r)` for each `r in RminR2L`.
 3. For every requested `n >= 2`, compute `Gamma[n]` from `Gamma[n - 1]`.
 4. For each previous ambiguity `amb` with pieces `[u_{-1}, u_0, ..., u_{n-1}]`, treat the previous ambiguity as already valid. Do not check the earlier pieces again.
 5. For each candidate extension, look only at `u_{n-1}` together with the proposed right-appended piece `u_n`.
-6. For each minimal relation `r`, require `u_{n-1}` to be a proper prefix of `r`.
-7. Define `rightAppend` to be the remaining suffix of `r` after this prefix.
-8. The candidate is valid only when `u_{n-1} + rightAppend = r`.
-9. Reject the candidate if any strict suffix of `u_{n-1} + rightAppend` is itself a minimal relation generator.
-10. Form the candidate underlying path `pNew = underlyingPathOfAmbiguity(amb) + rightAppend`. This concatenated path is used to construct and deduplicate the candidate, not to revalidate the old ambiguity from the beginning.
-11. Form the candidate piece list by replacing the previous rightmost non-vertex piece:
-   - old pieces: `[u_{-1}, u_0, ..., u_{n-2}, u_{n-1}]`;
-   - split the right-appended word as `rightAppend = r1...rk`;
-   - new pieces: `[u_{-1}, u_0, ..., u_{n-2}, u_{n-1} r1...r_{k-1}, r_k]`.
-12. If `rightAppend` has length `1`, then `u_{n-1} r1...r_{k-1}` means just `u_{n-1}`, so the new pieces are `[u_{-1}, u_0, ..., u_{n-1}, r1]`.
-13. Store these ambiguities with `orientation: "R2L"` and `kind: "left"`.
-14. Deduplicate candidates in `Gamma[n]` by the arrow word `pNew`.
+6. Choose `rightAppend` so that the adjacent word `u_{n-1} + rightAppend` is a valid path in the quiver and is of the form `p r`, where `r` is a minimal relation generator and `p` is a path. Equivalently, `u_{n-1} + rightAppend` is a path with a minimal relation generator as its literal suffix.
+7. Reject the candidate if any strict literal prefix of the path `u_{n-1} + rightAppend` is itself a minimal relation generator.
+8. Form the candidate underlying path `pNew = underlyingPathOfAmbiguity(amb) + rightAppend`. This concatenated path is used to construct and deduplicate the candidate, not to revalidate the old ambiguity from the beginning.
+9. Form the candidate piece list by appending `rightAppend` as the next piece `u_n`. Do not split `rightAppend`, and do not change the previous piece `u_{n-1}`:
+
+- old pieces: `[u_{-1}, u_0, ..., u_{n-2}, u_{n-1}]`;
+- new pieces: `[u_{-1}, u_0, ..., u_{n-2}, u_{n-1}, rightAppend]`.
+
+10. Store these ambiguities with `orientation: "R2L"` and `kind: "left"`.
+11. Deduplicate candidates in `Gamma[n]` by the arrow word `pNew`.
 
 Development cross-check:
 
 - Implement `computeRightAmbiguitiesL2R` using the equivalent `L2R` right-ambiguity construction.
 - `L2R` right ambiguities are stored as `u_n | u_{n-1} | ... | u_0 | u_{-1}`.
 - During development, `computeAmbiguities(input)` must:
-  1. call `tidyUpMonomialAlgebra(input)`;
-  2. compute `primaryLeftR2L`;
-  3. compute `checkRightL2R`;
-  4. map one side through `reverseOrientationOfAmbiguity`;
-  5. compare degree-by-degree after aligning display-only differences;
-  6. emit an `orientation-mismatch` warning if the two lists are not identical.
+    1. call `tidyUpMonomialAlgebra(input)`;
+    2. compute `primaryLeftR2L`;
+    3. compute `checkRightL2R`;
+    4. map one side through `reverseOrientationOfAmbiguity`;
+    5. compare degree-by-degree after aligning display-only differences;
+    6. emit an `orientation-mismatch` warning if the two lists are not identical.
 - A mismatch warning must appear in both `InfoPanel` and the `OutputPanel` ambiguity section. It must not be hidden in the console.
 - The mismatch warning should include the lowest degree where the two conventions diverge and enough display text to inspect the differing ambiguity rows.
 - Once the two implementations are stable, the cross-check may be kept behind a development flag, but the spec requires it during the development phase.
@@ -179,8 +179,8 @@ For a cochain degree `n >= 0`, basis elements are pairs:
 
 ```ts
 interface CochainBasisElement {
-  ambiguity: Ambiguity; // p in Gamma[n]
-  basisPath: Path;      // b in B
+    ambiguity: Ambiguity; // p in Gamma[n]
+    basisPath: Path; // b in B
 }
 ```
 
@@ -190,9 +190,9 @@ Represent coboundaries as sparse matrices:
 
 ```ts
 interface SparseMatrix {
-  rows: number;
-  cols: number;
-  entries: Array<{ row: number; col: number; value: FieldElement }>;
+    rows: number;
+    cols: number;
+    entries: Array<{ row: number; col: number; value: FieldElement }>;
 }
 ```
 
@@ -235,4 +235,3 @@ Requirements:
 - return multiplication tables for all `HH^i x HH^j -> HH^{i+j}` with `i + j <= maxDegree`.
 
 Return product data in both machine-readable and display-ready forms.
-

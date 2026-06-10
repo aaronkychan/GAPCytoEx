@@ -1926,6 +1926,14 @@ function pathFromWord(quiver, arrows, orientation) {
     orientation
   };
 }
+function isPathWord(quiver, arrows, orientation) {
+  try {
+    pathFromWord(quiver, arrows, orientation);
+    return true;
+  } catch {
+    return false;
+  }
+}
 function suffix(word, length) {
   return word.slice(word.length - length);
 }
@@ -1943,6 +1951,35 @@ function isStrictSuffixRelation(word, relationWords) {
     }
   }
   return false;
+}
+function isStrictPrefixRelation(word, relationWords) {
+  for (let length = 1;length < word.length; length += 1) {
+    const wordPrefix = prefix(word, length);
+    if (relationWords.some((relationWord) => wordsEqual(wordPrefix, relationWord))) {
+      return true;
+    }
+  }
+  return false;
+}
+function rightAppendsForRelationSuffix(lastPieceWord, relationWord) {
+  const appends = [];
+  const maxOverlap = Math.min(lastPieceWord.length, relationWord.length - 1);
+  for (let overlap = maxOverlap;overlap >= 0; overlap -= 1) {
+    if (wordsEqual(suffix(lastPieceWord, overlap), prefix(relationWord, overlap))) {
+      appends.push(relationWord.slice(overlap));
+    }
+  }
+  return appends;
+}
+function leftPrependsForRelationPrefix(firstPieceWord, relationWord) {
+  const prepends = [];
+  const maxOverlap = Math.min(firstPieceWord.length, relationWord.length - 1);
+  for (let overlap = maxOverlap;overlap >= 0; overlap -= 1) {
+    if (wordsEqual(prefix(firstPieceWord, overlap), suffix(relationWord, overlap))) {
+      prepends.push(relationWord.slice(0, relationWord.length - overlap));
+    }
+  }
+  return prepends;
 }
 function ambiguityKey(ambiguity) {
   const path = underlyingPathOfAmbiguity(ambiguity);
@@ -2079,29 +2116,22 @@ function computeNextLeftR2L(input, previous, degree) {
       continue;
     }
     for (const relationWord of relationWords) {
-      if (lastPiece.arrows.length >= relationWord.length || !wordsEqual(lastPiece.arrows, prefix(relationWord, lastPiece.arrows.length))) {
-        continue;
+      for (const rightAppend of rightAppendsForRelationSuffix(lastPiece.arrows, relationWord)) {
+        const joinedRight = [...lastPiece.arrows, ...rightAppend];
+        if (!isPathWord(input.quiver, joinedRight, "R2L") || !wordsEqual(suffix(joinedRight, relationWord.length), relationWord) || isStrictPrefixRelation(joinedRight, relationWords)) {
+          continue;
+        }
+        const nextPieces = [
+          ...ambiguity.pieces,
+          pathFromWord(input.quiver, rightAppend, "R2L")
+        ];
+        candidates.push({
+          n: degree,
+          pieces: nextPieces,
+          orientation: "R2L",
+          kind: "left"
+        });
       }
-      const rightAppend = relationWord.slice(lastPiece.arrows.length);
-      const joinedRight = [...lastPiece.arrows, ...rightAppend];
-      if (!wordsEqual(joinedRight, relationWord) || isStrictSuffixRelation(joinedRight, relationWords)) {
-        continue;
-      }
-      const appendedExceptLast = rightAppend.slice(0, -1);
-      const finalArrow = rightAppend[rightAppend.length - 1];
-      const nextPieces = ambiguity.pieces.slice(0, -1);
-      if (appendedExceptLast.length > 0) {
-        nextPieces.push(pathFromWord(input.quiver, [...lastPiece.arrows, ...appendedExceptLast], "R2L"));
-      } else {
-        nextPieces.push(lastPiece);
-      }
-      nextPieces.push(pathFromWord(input.quiver, [finalArrow], "R2L"));
-      candidates.push({
-        n: degree,
-        pieces: nextPieces,
-        orientation: "R2L",
-        kind: "left"
-      });
     }
   }
   const deduped = dedupeAmbiguities(candidates);
@@ -2126,29 +2156,22 @@ function computeNextRightL2R(input, previous, degree) {
       continue;
     }
     for (const relationWord of relationWords) {
-      if (firstPiece.arrows.length >= relationWord.length || !wordsEqual(firstPiece.arrows, suffix(relationWord, firstPiece.arrows.length))) {
-        continue;
+      for (const leftPrepend of leftPrependsForRelationPrefix(firstPiece.arrows, relationWord)) {
+        const joinedLeft = [...leftPrepend, ...firstPiece.arrows];
+        if (!isPathWord(input.quiver, joinedLeft, "L2R") || !wordsEqual(prefix(joinedLeft, relationWord.length), relationWord) || isStrictSuffixRelation(joinedLeft, relationWords)) {
+          continue;
+        }
+        const nextPieces = [
+          pathFromWord(input.quiver, leftPrepend, "L2R"),
+          ...ambiguity.pieces
+        ];
+        candidates.push({
+          n: degree,
+          pieces: nextPieces,
+          orientation: "L2R",
+          kind: "right"
+        });
       }
-      const leftPrepend = relationWord.slice(0, relationWord.length - firstPiece.arrows.length);
-      const joinedLeft = [...leftPrepend, ...firstPiece.arrows];
-      if (!wordsEqual(joinedLeft, relationWord) || isStrictSuffixRelation(joinedLeft, relationWords)) {
-        continue;
-      }
-      const firstArrow = leftPrepend[0];
-      const remainingPrepend = leftPrepend.slice(1);
-      const nextPieces = [pathFromWord(input.quiver, [firstArrow], "L2R")];
-      if (remainingPrepend.length > 0) {
-        nextPieces.push(pathFromWord(input.quiver, [...remainingPrepend, ...firstPiece.arrows], "L2R"));
-        nextPieces.push(...ambiguity.pieces.slice(1));
-      } else {
-        nextPieces.push(...ambiguity.pieces);
-      }
-      candidates.push({
-        n: degree,
-        pieces: nextPieces,
-        orientation: "L2R",
-        kind: "right"
-      });
     }
   }
   const deduped = dedupeAmbiguities(candidates);
@@ -2561,5 +2584,5 @@ maxPathLength?.addEventListener("input", () => {
 });
 bindWorkbenchEvents(state);
 
-//# debugId=6D5CA7BDA7FD8C2364756E2164756E21
+//# debugId=1C183397E498C18C64756E2164756E21
 //# sourceMappingURL=app.js.map
