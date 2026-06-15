@@ -136,9 +136,10 @@ Optional monomial-only computation controls live in `OutputPanel`, not in a sepa
 Available controls:
 
 - maximum ambiguity index `N`;
-- `maxPathLength` for admissible path enumeration, shown as a numeric input on the right side of the `Monomial algebra` section title, default `50`, minimum `20`;
+- `maxPathLength` for admissible path enumeration, shown as a compact numeric input on the right side of the `Monomial algebra` section title, default `50`, minimum `20`;
+- an adjacent info icon explains that `maxPathLength` bounds admissible-path enumeration because the tool does not first prove finite-dimensionality; the explanation must be available on hover, keyboard focus, and tap/click for touch users;
 - compute ambiguities;
-- Hochschild-complex, Hochschild cohomology, and cup-product controls may appear as disabled or staged placeholders before their implementation stage, but they must not run placeholder computations.
+- Hochschild cochain-complex and Hochschild cohomology controls are active after their implementation stages. Cup-product controls may appear as disabled or staged placeholders before their implementation stage, but they must not run placeholder computations.
 
 Before running any monomial-only computation:
 
@@ -155,6 +156,7 @@ Before running any monomial-only computation:
 Computation output behavior:
 
 - computation buttons write summaries and warnings to `OutputPanel`; selectable path-indexed rows may render in lower-left computation tabs when they need relation-list-style selection behavior;
+- Hochschild cohomology enhances the Hochschild tab: it adds a vertex-term `HH^0` block, keeps differentials compact as framed `d^n` buttons with per-basis image tooltips and per-degree expandable full rows, places `HH^{n + 1}` summaries after the `C^n` basis rows, and lists selectable representative rows under `Cohom. representative`.
 - the panel is append-or-replace by computation type: rerunning ambiguities replaces the previous ambiguity block, while later Hochschild-complex/cohomology/cup-product blocks may coexist as separate sections;
 - there is no separate detail output panel. Detailed rows are expanded in place inside the single `OutputPanel`, and row selection writes concise details to the Info/Log textbox when details are needed;
 - each output section has a header, degree range, timestamp or stale marker, compact summary, and expandable detailed rows;

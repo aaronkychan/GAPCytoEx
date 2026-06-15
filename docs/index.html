@@ -91,16 +91,10 @@
                                     >
                                         rank-4 monomial Nakayama
                                     </button>
-                                    <button
-                                        type="button"
-                                        id="alosRank3Preset"
-                                    >
+                                    <button type="button" id="alosRank3Preset">
                                         [ALOS] rank-3 monomial example
                                     </button>
-                                    <button
-                                        type="button"
-                                        id="brauerStarPreset"
-                                    >
+                                    <button type="button" id="brauerStarPreset">
                                         rank-n Brauer star
                                     </button>
                                     <input
@@ -337,6 +331,28 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                                         min="20"
                                         value="50"
                                     />
+                                    <button
+                                        type="button"
+                                        id="maxPathLengthInfo"
+                                        class="info-icon-button"
+                                        aria-label="About maxPathLength"
+                                        aria-describedby="maxPathLengthTooltip"
+                                        aria-expanded="false"
+                                    >
+                                        i
+                                    </button>
+                                    <span
+                                        id="maxPathLengthTooltip"
+                                        class="control-tooltip"
+                                        role="tooltip"
+                                    >
+                                        Bounds the enumeration of non-vanishing
+                                        paths. Since the tool does not first
+                                        prove the algebra is finite-dimensional,
+                                        this limit prevents infinite path
+                                        enumeration when paths outside the
+                                        relation ideal continue indefinitely.
+                                    </span>
                                 </label>
                             </div>
                             <div class="monomial-grid">
@@ -362,7 +378,10 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                                 >
                                     Hochschild cochain complex
                                 </button>
-                                <button type="button" disabled>
+                                <button
+                                    type="button"
+                                    id="computeHochschildCohomologyBtn"
+                                >
                                     Hochschild cohomology
                                 </button>
                                 <button type="button" disabled>
@@ -444,7 +463,7 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                                     aria-pressed="false"
                                     hidden
                                 >
-                                    Hochschild complex
+                                    Hochschild
                                 </button>
                             </div>
                             <div

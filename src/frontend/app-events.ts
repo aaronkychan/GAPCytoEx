@@ -5,7 +5,7 @@ import { editSelectedRelation, focusAddRelationEditor, guardRelationOutputEdit, 
 import { appendInfoLog, setError, setFieldCharacteristic, setOutputHtml } from "./log-panel";
 import { loadJsonFile, saveFile, translateToQpa } from "./file-actions";
 import { applyTheme, initialTheme, toggleTheme } from "./theme";
-import { computeAndRenderAmbiguities, computeAndRenderHochschildComplex } from "./computation-controller";
+import { computeAndRenderAmbiguities, computeAndRenderHochschildCohomology, computeAndRenderHochschildComplex } from "./computation-controller";
 
 function bindClick(id: string, handler: (event: MouseEvent) => void): void {
   document.getElementById(id)?.addEventListener("click", (event) => handler(event as MouseEvent));
@@ -63,6 +63,34 @@ function promptBrauerStarRank(): void {
     return;
   }
   replaceQpaInput(buildBrauerStarQpa(rank));
+}
+
+function bindMaxPathLengthTooltip(): void {
+  const button = document.getElementById("maxPathLengthInfo") as HTMLButtonElement | null;
+  const control = button?.closest(".max-path-control");
+  if (!button || !control) {
+    return;
+  }
+  const closeTooltip = (): void => {
+    control.classList.remove("is-tooltip-open");
+    button.setAttribute("aria-expanded", "false");
+  };
+
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isOpen = control.classList.toggle("is-tooltip-open");
+    button.setAttribute("aria-expanded", String(isOpen));
+  });
+  document.addEventListener("click", (event) => {
+    if (!control.contains(event.target as Node)) {
+      closeTooltip();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeTooltip();
+    }
+  });
 }
 
 function replaceQpaInput(value: string): void {
@@ -124,6 +152,7 @@ export function bindWorkbenchEvents(state: WorkbenchState): void {
   bindClick("toQPABtn", () => translateToQpa(state));
   bindClick("computeAmbiguitiesBtn", () => computeAndRenderAmbiguities(state));
   bindClick("computeHochschildComplexBtn", () => computeAndRenderHochschildComplex(state));
+  bindClick("computeHochschildCohomologyBtn", () => computeAndRenderHochschildCohomology(state));
   bindClick("resetCanvasRelations", () => {
     clearAll(state);
     updateDrawButtonLabel();
@@ -192,6 +221,7 @@ export function bindWorkbenchEvents(state: WorkbenchState): void {
   lastDrawnQpaInput = currentQpaInputValue();
   setPathOrientation(state, state.activePathOrientation);
   setFieldCharacteristic(0, false);
+  bindMaxPathLengthTooltip();
   updateDrawButtonLabel();
   appendInfoLog("Ready.");
 }

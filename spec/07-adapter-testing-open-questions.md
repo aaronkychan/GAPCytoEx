@@ -36,8 +36,7 @@ Backend tests:
 - `underlyingPathOfAmbiguity` concatenates ambiguity pieces correctly, including length-zero vertex paths;
 - minimal relation antichain minimising;
 - empty relation lists produce populated `Gamma[-1]` and `Gamma[0]`, with empty `Gamma[n]` for every `n >= 1`;
-- lazy ambiguity, Hochschild cochain term, and coboundary sequences compute only requested degrees and cache repeated `getAt(n)` calls;
-- delayable Stage 4 TODO: once Hochschild cohomology exists, test that cohomology `groups.getAt(d)` caches repeated degree requests and reuses the needed Hochschild cochain data;
+- lazy ambiguity, Hochschild cochain term, coboundary, and Hochschild cohomology group sequences compute only requested degrees and cache repeated `getAt(n)` calls;
 - `getArray(start, endInclusive)` returns the same data as repeated cached `getAt(n)` calls over that interval;
 - admissible basis enumeration and finite-dimensional failure path;
 - ambiguity sets for hand-computed examples;
@@ -48,7 +47,7 @@ Backend tests:
 - Hochschild cochain indexing: `terms.getAt(n)` is defined only for `n >= 0`, `terms.getAt(n)` uses `Gamma[n]`, and `coboundaries.getAt(n)` is `d^n : terms[n] -> terms[n + 1]` for `n >= 0`;
 - negative `getAt` requests are rejected for every lazy sequence except ambiguity, where `getAt(-1)` is valid;
 - coboundary matrices satisfy `d^{n + 1} * d^n = 0`;
-- cohomology for small known examples;
+- cohomology for small known examples, including the rank-3 ALOS monomial example from paper Example 5.5;
 - cup product for quadratic and triangular examples.
 
 Frontend tests:
@@ -75,7 +74,7 @@ Visual QA:
 
 ## Open Questions Requiring Resolution
 
-1. Prime finite fields `F_p` remain deferred; v1 Hochschild cochain-complex computation uses rational coefficients.
+1. Prime finite fields `F_p` remain deferred; v1 Hochschild cochain-complex and cohomology computation uses rational coefficients.
 2. Should the frontend be rebuilt as a Vite/React TypeScript app, or kept as a vanilla TypeScript app compiled into the existing two-file style?
 3. After `Confirm monomial algebra`, should graph editing be locked, or should edits be allowed while marking computations stale?
 4. Should QPA text import remain fully supported, or only be preserved as a best-effort legacy import/export path?

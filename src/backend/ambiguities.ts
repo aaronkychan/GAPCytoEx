@@ -234,7 +234,7 @@ function rightAppendsForRelationSuffix(
 ): ArrowId[][] {
     const appends: ArrowId[][] = [];
     const maxOverlap = Math.min(lastPieceWord.length, relationWord.length - 1);
-    for (let overlap = maxOverlap; overlap >= 0; overlap -= 1) {
+    for (let overlap = maxOverlap; overlap >= 1; overlap -= 1) {
         if (
             wordsEqual(
                 suffix(lastPieceWord, overlap),
@@ -253,7 +253,7 @@ function leftPrependsForRelationPrefix(
 ): ArrowId[][] {
     const prepends: ArrowId[][] = [];
     const maxOverlap = Math.min(firstPieceWord.length, relationWord.length - 1);
-    for (let overlap = maxOverlap; overlap >= 0; overlap -= 1) {
+    for (let overlap = maxOverlap; overlap >= 1; overlap -= 1) {
         if (
             wordsEqual(
                 prefix(firstPieceWord, overlap),

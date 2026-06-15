@@ -120,6 +120,7 @@ Primary `R2L` left-ambiguity implementation logic:
 4. For each previous ambiguity `amb` with pieces `[u_{-1}, u_0, ..., u_{n-1}]`, treat the previous ambiguity as already valid. Do not check the earlier pieces again.
 5. For each candidate extension, look only at `u_{n-1}` together with the proposed right-appended piece `u_n`.
 6. Choose `rightAppend` so that the adjacent word `u_{n-1} + rightAppend` is a valid path in the quiver and is of the form `p r`, where `r` is a minimal relation generator and `p` is a path. Equivalently, `u_{n-1} + rightAppend` is a path with a minimal relation generator as its literal suffix.
+    - The overlap between `u_{n-1}` and `r` must be nontrivial. Zero-overlap concatenations of two unrelated relation words are not Bardzell ambiguities and must be rejected even when the quiver path composes.
 7. Reject the candidate if any strict literal prefix of the path `u_{n-1} + rightAppend` is itself a minimal relation generator.
 8. Form the candidate underlying path `pNew = underlyingPathOfAmbiguity(amb) + rightAppend`. This concatenated path is used to construct and deduplicate the candidate, not to revalidate the old ambiguity from the beginning.
 9. Form the candidate piece list by appending `rightAppend` as the next piece `u_n`. Do not split `rightAppend`, and do not change the previous piece `u_{n-1}`:
@@ -208,9 +209,17 @@ Use the paper's Hochschild coboundary formulas with the cochain indexing above a
 
 When computing a bounded range of terms through `C^N`, check all newly available identities `d^{i + 1} d^i = 0`. The first bounded computation checks from `i = 0`; if a later computation raises the bound, start from the first previously unchecked index. If a composite is nonzero, log a visible warning that `d` is not a differential and report the troublesome index.
 
-If the user computes the Hochschild cochain complex before computing ambiguities, the frontend must first compute the admissible basis and ambiguity data, populate the Ambiguities tab with the usual ambiguity rows, then focus the Hochschild complex tab.
+If the user computes the Hochschild cochain complex before computing ambiguities, the frontend must first compute the admissible basis and ambiguity data, populate the Ambiguities tab with the usual ambiguity rows, then focus the Hochschild tab.
 
-The lower-left relation-list panel may show a Hochschild complex tab after a successful computation. This tab displays the finite requested slice of terms and differentials. Zero terms display only `C^n (0)`. A differential that is zero on every basis element displays only `d^n = 0`. Nonzero images display in the form `p||b ↦ sum`.
+The lower-left relation-list panel may show a Hochschild tab after a successful computation. This tab displays the finite requested slice of terms and compact differential controls. Zero terms display only `C^n (dim=0)`. Nonzero terms display `C^n (dim=d)`. If `d^n` is available in the displayed slice, show a small framed `d^n` button after the term heading, or `d^n = 0` when the whole differential is zero. Clicking the term-heading differential button toggles only that degree's expanded full differential rows; the expansion state is retained across ordinary tab rerenders until the computation is replaced or cleared.
+
+Each basis row `p||b` in `C^n` also shows a small framed `d^n` button, except a zero image displays as `d^n↦0`. Hovering this button, or clicking/tapping it on touch devices, shows only the right-hand side of the image of `p||b`. The tooltip displays one monomial summand per line, with signs at the start of each non-first signed line, for example:
+
+```text
+  q1||c1
++q2||c2
+-q3||c3
+```
 
 Selecting a Hochschild basis row `p||b` highlights the ambiguity path `p` and basis path `b` in two contrasting colors on the canvas and writes a concise color legend to the visible Info/Log textbox.
 
@@ -224,7 +233,7 @@ Prime finite fields `F_p` are deferred until the cohomology linear-algebra stage
 
 ### 5. Compute Cohomology
 
-Hochschild cohomology is virtual degreewise data, implemented only after the Hochschild cochain-complex stage has been human-checked. `computeHochschildCohomology(input)` returns an object whose `groups.getAt(d)` computes `HH^d` only when requested, using the cached cochain data needed in that degree.
+Hochschild cohomology is virtual degreewise data. `buildHochschildCohomology(input)` returns an object whose `groups.getAt(d)` computes `HH^d` only when requested, using the cached cochain data needed in that degree.
 
 Compute:
 
@@ -232,13 +241,36 @@ Compute:
 HH^d = Ext^d_{A^e}(A, A)
 ```
 
-Use TypeScript linear algebra over the selected field:
+Important indexing distinction:
+
+- The lower-left Hochschild tab intentionally displays the non-negative sequence `C^n = k Gamma[n] || B`.
+- Hochschild cohomology itself uses the usual degree-zero vertex term `k Gamma[-1] || B`.
+- Therefore `HH^0` is computed from `k Gamma[-1] || B -> k Gamma[0] || B`.
+- For `d > 0`, `HH^d` is computed from displayed cochain term `C^{d - 1}`:
+
+```text
+HH^d = ker(C^{d - 1} -> C^d) / im(C^{d - 2} -> C^{d - 1})  for d > 1,
+HH^1 = ker(C^0 -> C^1) / im(k Gamma[-1] || B -> C^0).
+```
+
+The missing degree-zero differential is the standard commutator map on vertex cochains. For a vertex cochain supported at vertex `v` by an admissible cycle `b`, and an arrow `a`, it contributes `a b` when `t(a) = v` and `- b a` when `s(a) = v`, discarding products that vanish in the monomial algebra.
+
+Use TypeScript linear algebra over rational coefficients:
 
 - sparse-to-row-reduction conversion is acceptable for v1;
 - expose kernel bases, image bases, quotient representatives, and coordinate maps;
 - retain `p || b` metadata so results remain readable.
 
 To compute `HH^d`, the backend must compute enough Hochschild cochain terms and coboundaries to form the degreewise kernel/image quotient. To get the array of `HH^0` through `HH^N`, it is acceptable and expected that the lazy backend computes cochain data through the needed degrees.
+
+The frontend `Hochschild cohomology` button must reuse the cached monomial context and Hochschild cochain complex when available. The Hochschild tab is enhanced with cohomology data rather than replaced by a disconnected table:
+
+- a top vertex-term block displays `HH^0`;
+- each displayed `C^n` block is ordered as: `C^n (dim=d)` plus compact `d^n` button, basis rows with compact `d^n` image buttons, `HH^{n + 1}: dim=...`, `(dim ker=..., dim im=...)`, then representative rows;
+- cohomology summaries use the accent color, while `C^n` and `d^n` headings use the muted term-heading color;
+- representative rows are grouped under the heading `Cohom. representative`;
+- representative rows display only the representative expression, not a prefixed `[HH^d.k]` label;
+- selecting a representative row highlights all involved displayed basis rows when they lie in the displayed cochain complex, and highlights all involved `p` and `b` paths on the canvas using the existing Hochschild basis colors.
 
 ### 6. Compute Cup Product
 

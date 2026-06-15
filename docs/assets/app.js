@@ -16,9 +16,12 @@ function createWorkbenchState() {
     activeFieldCharacteristic: 0,
     monomialComputationContext: null,
     ambiguityGroupsByOrientation: null,
+    hochschildCochainComplex: null,
     hochschildComplex: null,
+    expandedHochschildDifferentials: new Set,
     selectedAmbiguityId: null,
     selectedHochschildBasisId: null,
+    selectedHochschildRepresentativeId: null,
     relationPanelTab: "relations"
   };
 }
@@ -1157,7 +1160,7 @@ function isStrictPrefixRelation(word, relationWords) {
 function rightAppendsForRelationSuffix(lastPieceWord, relationWord) {
   const appends = [];
   const maxOverlap = Math.min(lastPieceWord.length, relationWord.length - 1);
-  for (let overlap = maxOverlap;overlap >= 0; overlap -= 1) {
+  for (let overlap = maxOverlap;overlap >= 1; overlap -= 1) {
     if (wordsEqual(suffix(lastPieceWord, overlap), prefix(relationWord, overlap))) {
       appends.push(relationWord.slice(overlap));
     }
@@ -1167,7 +1170,7 @@ function rightAppendsForRelationSuffix(lastPieceWord, relationWord) {
 function leftPrependsForRelationPrefix(firstPieceWord, relationWord) {
   const prepends = [];
   const maxOverlap = Math.min(firstPieceWord.length, relationWord.length - 1);
-  for (let overlap = maxOverlap;overlap >= 0; overlap -= 1) {
+  for (let overlap = maxOverlap;overlap >= 1; overlap -= 1) {
     if (wordsEqual(prefix(firstPieceWord, overlap), suffix(relationWord, overlap))) {
       prepends.push(relationWord.slice(0, relationWord.length - overlap));
     }
@@ -1573,6 +1576,9 @@ function ambiguityRowId(degree, index) {
 function hochschildBasisRowId(degree, index) {
   return `hochschild-${degree}-${index}`;
 }
+function hochschildRepresentativeRowId(degree, index) {
+  return `hochschild-rep-${degree}-${index}`;
+}
 function ambiguityByIndex(state, degree, index) {
   const groups = state.ambiguityGroupsByOrientation?.[state.activePathOrientation];
   const group = groups?.find((candidate) => candidate.degree === degree);
@@ -1581,6 +1587,10 @@ function ambiguityByIndex(state, degree, index) {
 function hochschildBasisByIndex(state, degree, index) {
   const term = state.hochschildComplex?.terms.find((candidate) => candidate.degree === degree);
   return term?.basis[index] ?? null;
+}
+function hochschildRepresentativeByIndex(state, degree, index) {
+  const group = state.hochschildComplex?.cohomologyGroups?.find((candidate) => candidate.degree === degree);
+  return group?.representatives[index] ?? null;
 }
 function resetCanvasEdgeStyles(state) {
   if (!state.cy) {
@@ -1698,9 +1708,12 @@ function refreshAmbiguitiesOutput(state) {
 function clearAmbiguityResults(state) {
   state.monomialComputationContext = null;
   state.ambiguityGroupsByOrientation = null;
+  state.hochschildCochainComplex = null;
   state.hochschildComplex = null;
+  state.expandedHochschildDifferentials = new Set;
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   state.relationPanelTab = "relations";
   refreshAmbiguitiesOutput(state);
   refreshHochschildComplexOutput(state);
@@ -1720,17 +1733,114 @@ function formatCoefficient(value, isFirst) {
   }
   return isFirst ? `${value} ` : `+ ${value} `;
 }
-function formatImageForColumn(matrix, target, col) {
+function formatDifferentialImageLines(matrix, target, col) {
+  const entries = matrix.entries.filter((entry) => entry.col === col);
+  if (entries.length === 0) {
+    return ["0"];
+  }
+  return entries.map((entry, index) => {
+    const basis = formatCochainBasisElement(target.basis[entry.row]);
+    if (entry.value === 1) {
+      return index === 0 ? `  ${basis}` : `+${basis}`;
+    }
+    if (entry.value === -1) {
+      return `-${basis}`;
+    }
+    if (entry.value > 0) {
+      return index === 0 ? `  ${entry.value} ${basis}` : `+${entry.value} ${basis}`;
+    }
+    return `${entry.value} ${basis}`;
+  });
+}
+function formatDifferentialImageInline(matrix, target, col) {
   const entries = matrix.entries.filter((entry) => entry.col === col);
   if (entries.length === 0) {
     return "0";
   }
   return entries.map((entry, index) => `${formatCoefficient(entry.value, index === 0)}${formatCochainBasisElement(target.basis[entry.row])}`).join(" ");
 }
-function appendHochschildTerm(output, state, term, rowIndex) {
+function closeDifferentialTooltips() {
+  document.querySelectorAll(".differential-tooltip-wrap.is-open").forEach((element) => element.classList.remove("is-open"));
+}
+function appendDifferentialButton(container, label, imageLines, onClick) {
+  const wrap = document.createElement("span");
+  wrap.className = "differential-tooltip-wrap";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "differential-chip";
+  button.textContent = label;
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (imageLines) {
+      const shouldOpen = !wrap.classList.contains("is-open");
+      closeDifferentialTooltips();
+      wrap.classList.toggle("is-open", shouldOpen);
+    }
+    onClick?.();
+  });
+  wrap.appendChild(button);
+  if (imageLines) {
+    const tooltip = document.createElement("span");
+    tooltip.className = "differential-tooltip";
+    imageLines.forEach((line) => {
+      const lineElement = document.createElement("span");
+      lineElement.textContent = line;
+      tooltip.appendChild(lineElement);
+    });
+    wrap.appendChild(tooltip);
+  }
+  container.appendChild(wrap);
+}
+function toggleExpandedDifferential(state, degree) {
+  if (state.expandedHochschildDifferentials.has(degree)) {
+    state.expandedHochschildDifferentials.delete(degree);
+  } else {
+    state.expandedHochschildDifferentials.add(degree);
+  }
+  refreshHochschildComplexOutput(state);
+}
+function formatCohomologyRepresentative(representative) {
+  if (representative.terms.length === 0) {
+    return "0";
+  }
+  return representative.terms.map((term, index) => `${formatCoefficient(term.coefficient, index === 0)}${formatCochainBasisElement(term.basisElement)}`).join(" ");
+}
+function appendCohomologySummary(output, group) {
+  const summary = document.createElement("div");
+  summary.className = "hochschild-cohomology-summary";
+  summary.textContent = `HH^${group.degree}: dim=${group.dimension}`;
+  output.appendChild(summary);
+  const detail = document.createElement("div");
+  detail.className = "hochschild-cohomology-detail";
+  detail.textContent = `(dim ker=${group.kernelDimension}, dim im=${group.imageDimension})`;
+  output.appendChild(detail);
+}
+function appendCohomologyRepresentatives(output, state, group, rowIndex) {
+  if (group.representatives.length === 0) {
+    return;
+  }
+  const heading = document.createElement("div");
+  heading.className = "ambiguity-degree hochschild-representative-heading";
+  heading.textContent = "Cohom. representative";
+  output.appendChild(heading);
+  group.representatives.forEach((representative, representativeIndex) => {
+    const row = document.createElement("div");
+    row.className = `hochschildRow cohomology-representative-row ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
+    row.dataset.hochschildRepresentativeId = hochschildRepresentativeRowId(group.degree, representativeIndex);
+    row.textContent = formatCohomologyRepresentative(representative);
+    row.addEventListener("click", () => selectHochschildRepresentative(state, group.degree, representativeIndex));
+    output.appendChild(row);
+    rowIndex.value += 1;
+  });
+}
+function appendHochschildTerm(output, state, term, target, matrix, rowIndex) {
   const heading = document.createElement("div");
   heading.className = "ambiguity-degree";
-  heading.textContent = `C^${term.degree} (${term.dimension})`;
+  heading.appendChild(document.createTextNode(`C^${term.degree} (dim=${term.dimension})`));
+  if (target && matrix) {
+    heading.appendChild(document.createTextNode("  "));
+    appendDifferentialButton(heading, matrix.entries.length === 0 ? `d^${term.degree} = 0` : `d^${term.degree}`, undefined, () => toggleExpandedDifferential(state, term.degree));
+  }
   output.appendChild(heading);
   if (term.basis.length === 0) {
     return;
@@ -1739,19 +1849,19 @@ function appendHochschildTerm(output, state, term, rowIndex) {
     const row = document.createElement("div");
     row.className = `hochschildRow ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
     row.dataset.hochschildBasisId = hochschildBasisRowId(term.degree, basisIndex);
-    row.textContent = formatCochainBasisElement(basisElement);
+    row.appendChild(document.createTextNode(formatCochainBasisElement(basisElement)));
+    if (target && matrix) {
+      row.appendChild(document.createTextNode("  "));
+      const imageLines = formatDifferentialImageLines(matrix, target, basisIndex);
+      appendDifferentialButton(row, imageLines.length === 1 && imageLines[0] === "0" ? `d^${term.degree}↦0` : `d^${term.degree}`, imageLines);
+    }
     row.addEventListener("click", () => selectHochschildBasis(state, term.degree, basisIndex));
     output.appendChild(row);
     rowIndex.value += 1;
   });
 }
-function appendHochschildDifferential(output, source, target, matrix, rowIndex) {
-  const heading = document.createElement("div");
-  heading.className = "ambiguity-degree hochschild-differential-heading";
-  const hasNonzeroImage = matrix.entries.length > 0;
-  heading.textContent = hasNonzeroImage ? `d^${source.degree}` : `d^${source.degree} = 0`;
-  output.appendChild(heading);
-  if (source.basis.length === 0 || !hasNonzeroImage) {
+function appendExpandedHochschildDifferential(output, source, target, matrix, rowIndex) {
+  if (source.basis.length === 0 || matrix.entries.length === 0) {
     return;
   }
   source.basis.forEach((basisElement, col) => {
@@ -1760,7 +1870,7 @@ function appendHochschildDifferential(output, source, target, matrix, rowIndex) 
     }
     const row = document.createElement("div");
     row.className = `hochschildRow differential-row ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
-    row.textContent = `${formatCochainBasisElement(basisElement)} ↦ ${formatImageForColumn(matrix, target, col)}`;
+    row.textContent = `${formatCochainBasisElement(basisElement)} ↦ ${formatDifferentialImageInline(matrix, target, col)}`;
     output.appendChild(row);
     rowIndex.value += 1;
   });
@@ -1773,20 +1883,36 @@ function refreshHochschildComplexOutput(state) {
   }
   output.innerHTML = "";
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   const complex = state.hochschildComplex;
   if (!complex) {
     return;
   }
   const rowIndex = { value: 0 };
+  const cohomologyGroupsByDegree = new Map((complex.cohomologyGroups ?? []).map((group) => [group.degree, group]));
+  const hh0 = cohomologyGroupsByDegree.get(0);
+  if (hh0) {
+    const heading = document.createElement("div");
+    heading.className = "ambiguity-degree";
+    heading.textContent = `Vertex term k Gamma[-1]||B (dim=${hh0.term.dimension})`;
+    output.appendChild(heading);
+    appendCohomologySummary(output, hh0);
+    appendCohomologyRepresentatives(output, state, hh0, rowIndex);
+  }
   for (let index = 0;index < complex.terms.length; index += 1) {
-    if (index > 0) {
+    if (index > 0 || hh0) {
       output.appendChild(document.createElement("hr")).className = "ambiguity-divider";
     }
-    appendHochschildTerm(output, state, complex.terms[index], rowIndex);
     const nextTerm = complex.terms[index + 1];
     const differential = complex.coboundaries[index];
-    if (nextTerm && differential) {
-      appendHochschildDifferential(output, complex.terms[index], nextTerm, differential, rowIndex);
+    appendHochschildTerm(output, state, complex.terms[index], nextTerm, differential, rowIndex);
+    if (nextTerm && differential && state.expandedHochschildDifferentials.has(complex.terms[index].degree)) {
+      appendExpandedHochschildDifferential(output, complex.terms[index], nextTerm, differential, rowIndex);
+    }
+    const cohomologyGroup = cohomologyGroupsByDegree.get(complex.terms[index].degree + 1);
+    if (cohomologyGroup) {
+      appendCohomologySummary(output, cohomologyGroup);
+      appendCohomologyRepresentatives(output, state, cohomologyGroup, rowIndex);
     }
   }
 }
@@ -1816,6 +1942,7 @@ function selectHochschildBasis(state, degree, index) {
   state.selectedRelationIndex = -1;
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = hochschildBasisRowId(degree, index);
+  state.selectedHochschildRepresentativeId = null;
   clearRelationAnimation(state);
   resetCanvasEdgeStyles(state);
   document.querySelectorAll("#relOutput .relationRow").forEach((row2) => row2.classList.remove("selectedRelationRow"));
@@ -1843,6 +1970,54 @@ function selectHochschildBasis(state, degree, index) {
     });
   });
   appendInfoLog(`Selecting basis ${formatCochainBasisElement(basisElement)} of the ${degree}-th term of Hochschild complex. (p displayed in orange/amber color, b displayed in blue/green color)`);
+}
+function selectHochschildRepresentative(state, degree, index) {
+  const representative = hochschildRepresentativeByIndex(state, degree, index);
+  if (!representative) {
+    return;
+  }
+  state.selectedRelationIndex = -1;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = hochschildRepresentativeRowId(degree, index);
+  clearRelationAnimation(state);
+  resetCanvasEdgeStyles(state);
+  document.querySelectorAll("#relOutput .relationRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#hochschildComplexOutput .hochschildRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  const representativeRow = document.querySelector(`#hochschildComplexOutput [data-hochschild-representative-id="${state.selectedHochschildRepresentativeId}"]`);
+  representativeRow?.classList.add("selectedRelationRow");
+  const displayedTermDegree = degree - 1;
+  if (displayedTermDegree >= 0) {
+    const displayedTerm = state.hochschildComplex?.terms.find((term) => term.degree === displayedTermDegree);
+    representative.terms.forEach((term) => {
+      const basisIndex = displayedTerm?.basis.indexOf(term.basisElement) ?? -1;
+      if (basisIndex >= 0) {
+        document.querySelector(`#hochschildComplexOutput [data-hochschild-basis-id="${hochschildBasisRowId(displayedTermDegree, basisIndex)}"]`)?.classList.add("selectedRelationRow");
+      }
+    });
+  }
+  const pColor = relationHighlightColor(0);
+  const bColor = relationHighlightColor(1);
+  representative.terms.forEach((term) => {
+    underlyingPathOfAmbiguity(term.basisElement.ambiguity).arrows.forEach((arrow) => {
+      state.cy?.getElementById(arrow).style({
+        width: 4,
+        "line-color": pColor,
+        "target-arrow-color": pColor,
+        "target-arrow-shape": "triangle"
+      });
+    });
+    term.basisElement.basisPath.arrows.forEach((arrow) => {
+      state.cy?.getElementById(arrow).style({
+        width: 5,
+        "line-color": bColor,
+        "target-arrow-color": bColor,
+        "target-arrow-shape": "triangle"
+      });
+    });
+  });
+  appendInfoLog(`Selecting representative HH^${degree}.${index + 1}. (p displayed in orange/amber color, b displayed in blue/green color; multiple summands are highlighted)`);
 }
 function validateRelationArrowReferences(relations, cyInstance) {
   if (!cyInstance) {
@@ -1898,6 +2073,7 @@ function refreshRelationsOutput(state) {
   output.contentEditable = "false";
   state.selectedRelationIndex = -1;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   state.relations.forEach((relation, index) => {
     const row = document.createElement("div");
     row.classList.add("relationRow");
@@ -2017,6 +2193,7 @@ function selectRelation(state, index) {
   state.selectedRelationIndex = index;
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   clearRelationAnimation(state);
   if (!state.cy) {
     return;
@@ -2359,9 +2536,12 @@ function presentData(state, quiver, relations, isPreset = false) {
   state.relations = relations;
   state.monomialComputationContext = null;
   state.ambiguityGroupsByOrientation = null;
+  state.hochschildCochainComplex = null;
   state.hochschildComplex = null;
+  state.expandedHochschildDifferentials = new Set;
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   state.relationPanelTab = "relations";
   refreshRelationsOutput(state);
   ["saveSVG", "fixCyto", "wriggle", "toQPABtn"].forEach((id) => {
@@ -2430,9 +2610,12 @@ function doubleQuiver(state) {
   if (reverseArrows.length > 0) {
     state.monomialComputationContext = null;
     state.ambiguityGroupsByOrientation = null;
+    state.hochschildCochainComplex = null;
     state.hochschildComplex = null;
+    state.expandedHochschildDifferentials = new Set;
     state.selectedAmbiguityId = null;
     state.selectedHochschildBasisId = null;
+    state.selectedHochschildRepresentativeId = null;
     state.relationPanelTab = "relations";
     refreshRelationsOutput(state);
     state.cy.add(reverseArrows);
@@ -2449,9 +2632,12 @@ function clearAll(state) {
   state.relations = [];
   state.monomialComputationContext = null;
   state.ambiguityGroupsByOrientation = null;
+  state.hochschildCochainComplex = null;
   state.hochschildComplex = null;
+  state.expandedHochschildDifferentials = new Set;
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   state.relationPanelTab = "relations";
   state.cy = null;
   const quiverInput = document.getElementById("inQuiver");
@@ -2839,6 +3025,292 @@ function checkHochschildDifferential(complex, startDegree, endDegreeInclusive) {
   };
 }
 
+// src/backend/cohomology.ts
+var EPSILON = 0.0000000001;
+function assertNonNegativeCohomologyDegree(index) {
+  if (!Number.isInteger(index) || index < 0) {
+    throw new RangeError("Hochschild cohomology degrees must be non-negative integers.");
+  }
+}
+function makeLazySequence2(assertIndex, compute) {
+  const cache = new Map;
+  let sequence;
+  sequence = {
+    getAt(index) {
+      assertIndex(index);
+      if (!cache.has(index)) {
+        cache.set(index, compute(index));
+      }
+      return cache.get(index);
+    },
+    *getIteratorFrom(start) {
+      assertIndex(start);
+      let index = start;
+      while (true) {
+        yield [index, sequence.getAt(index)];
+        index += 1;
+      }
+    },
+    getArray(start, endInclusive) {
+      assertIndex(start);
+      if (endInclusive < start) {
+        return [];
+      }
+      const result = [];
+      for (let index = start;index <= endInclusive; index += 1) {
+        result.push([index, sequence.getAt(index)]);
+      }
+      return result;
+    }
+  };
+  return sequence;
+}
+function normalizeNumber(value) {
+  return Math.abs(value) < EPSILON ? 0 : value;
+}
+function sparseToDense(matrix) {
+  const dense = Array.from({ length: matrix.rows }, () => Array.from({ length: matrix.cols }, () => 0));
+  for (const entry of matrix.entries) {
+    dense[entry.row][entry.col] += entry.value;
+  }
+  return dense.map((row) => row.map(normalizeNumber));
+}
+function pathKey2(path) {
+  return `${path.source}:${path.target}:${printArrowWord(path.arrows)}`;
+}
+function termBasisKey2(element) {
+  return `${pathKey2(underlyingPathOfAmbiguity(element.ambiguity))}||${pathKey2(element.basisPath)}`;
+}
+function pathFromL2RWord2(quiver, arrows, emptyVertexId) {
+  if (arrows.length === 0) {
+    return vertexPath(emptyVertexId, "L2R");
+  }
+  const first = arrowById(quiver, arrows[0]);
+  if (!first) {
+    return null;
+  }
+  let previous = first;
+  for (const arrowId of arrows.slice(1)) {
+    const next = arrowById(quiver, arrowId);
+    if (!next || previous.target !== next.source) {
+      return null;
+    }
+    previous = next;
+  }
+  return {
+    arrows: [...arrows],
+    source: first.source,
+    target: previous.target,
+    orientation: "L2R"
+  };
+}
+function buildVertexCochainTerm(complex) {
+  const admissiblePaths = complex.admissiblePathEnumeration.paths;
+  const basis = [];
+  for (const vertex of complex.admissiblePathEnumeration.relationGenerators.quiver.vertices) {
+    const ambiguity = {
+      n: -1,
+      pieces: [vertexPath(vertex.id, "R2L")],
+      orientation: "R2L",
+      kind: "left"
+    };
+    for (const basisPath of admissiblePaths) {
+      if (basisPath.source === vertex.id && basisPath.target === vertex.id) {
+        basis.push({ ambiguity, basisPath });
+      }
+    }
+  }
+  return {
+    degree: 0,
+    basis,
+    dimension: basis.length
+  };
+}
+function addSparseEntry2(values, row, col, value) {
+  const key = `${row}:${col}`;
+  values.set(key, (values.get(key) ?? 0) + value);
+}
+function buildDegreeZeroDifferential(complex, source) {
+  const quiver = complex.admissiblePathEnumeration.relationGenerators.quiver;
+  const admissibleBasisByKey = new Map(complex.admissiblePathEnumeration.paths.map((path) => [pathKey2(path), path]));
+  const target = complex.terms.getAt(0);
+  const targetBasisByKey = new Map(target.basis.map((element, index) => [termBasisKey2(element), index]));
+  const values = new Map;
+  source.basis.forEach((sourceElement, col) => {
+    const vertexId = underlyingPathOfAmbiguity(sourceElement.ambiguity).target;
+    const cycleWord = sourceElement.basisPath.arrows;
+    for (const arrow of quiver.arrows) {
+      const targetAmbiguity = target.basis.find((element) => underlyingPathOfAmbiguity(element.ambiguity).arrows[0] === arrow.id)?.ambiguity;
+      if (!targetAmbiguity) {
+        continue;
+      }
+      if (arrow.target === vertexId) {
+        const product = pathFromL2RWord2(quiver, [arrow.id, ...cycleWord], arrow.source);
+        const basisPath = product ? admissibleBasisByKey.get(pathKey2(product)) : null;
+        if (basisPath) {
+          const row = targetBasisByKey.get(`${pathKey2(underlyingPathOfAmbiguity(targetAmbiguity))}||${pathKey2(basisPath)}`);
+          if (row !== undefined) {
+            addSparseEntry2(values, row, col, 1);
+          }
+        }
+      }
+      if (arrow.source === vertexId) {
+        const product = pathFromL2RWord2(quiver, [...cycleWord, arrow.id], arrow.target);
+        const basisPath = product ? admissibleBasisByKey.get(pathKey2(product)) : null;
+        if (basisPath) {
+          const row = targetBasisByKey.get(`${pathKey2(underlyingPathOfAmbiguity(targetAmbiguity))}||${pathKey2(basisPath)}`);
+          if (row !== undefined) {
+            addSparseEntry2(values, row, col, -1);
+          }
+        }
+      }
+    }
+  });
+  return {
+    rows: target.dimension,
+    cols: source.dimension,
+    entries: [...values.entries()].map(([key, value]) => {
+      const [row, col] = key.split(":").map(Number);
+      return { row, col, value: normalizeNumber(value) };
+    }).filter((entry) => entry.value !== 0).sort((left, right) => left.row === right.row ? left.col - right.col : left.row - right.row)
+  };
+}
+function rref(rows, columnCount = rows[0]?.length ?? 0) {
+  const matrix = rows.map((row) => {
+    const copy = row.slice(0, columnCount);
+    while (copy.length < columnCount) {
+      copy.push(0);
+    }
+    return copy;
+  });
+  const pivots = [];
+  let pivotRow = 0;
+  for (let col = 0;col < columnCount && pivotRow < matrix.length; col += 1) {
+    let bestRow = pivotRow;
+    for (let row = pivotRow + 1;row < matrix.length; row += 1) {
+      if (Math.abs(matrix[row][col]) > Math.abs(matrix[bestRow][col])) {
+        bestRow = row;
+      }
+    }
+    if (Math.abs(matrix[bestRow][col]) < EPSILON) {
+      continue;
+    }
+    [matrix[pivotRow], matrix[bestRow]] = [matrix[bestRow], matrix[pivotRow]];
+    const pivot = matrix[pivotRow][col];
+    for (let index = col;index < columnCount; index += 1) {
+      matrix[pivotRow][index] = normalizeNumber(matrix[pivotRow][index] / pivot);
+    }
+    for (let row = 0;row < matrix.length; row += 1) {
+      if (row === pivotRow) {
+        continue;
+      }
+      const factor = matrix[row][col];
+      if (Math.abs(factor) < EPSILON) {
+        continue;
+      }
+      for (let index = col;index < columnCount; index += 1) {
+        matrix[row][index] = normalizeNumber(matrix[row][index] - factor * matrix[pivotRow][index]);
+      }
+    }
+    pivots.push(col);
+    pivotRow += 1;
+  }
+  return {
+    matrix,
+    pivots,
+    rank: pivots.length
+  };
+}
+function kernelBasis(matrix) {
+  const reduced = rref(sparseToDense(matrix), matrix.cols);
+  const pivotSet = new Set(reduced.pivots);
+  const basis = [];
+  for (let freeCol = 0;freeCol < matrix.cols; freeCol += 1) {
+    if (pivotSet.has(freeCol)) {
+      continue;
+    }
+    const vector = Array.from({ length: matrix.cols }, () => 0);
+    vector[freeCol] = 1;
+    reduced.pivots.forEach((pivotCol, pivotRow) => {
+      vector[pivotCol] = normalizeNumber(-reduced.matrix[pivotRow][freeCol]);
+    });
+    basis.push(vector);
+  }
+  return basis;
+}
+function columnVectors(matrix) {
+  const columns = Array.from({ length: matrix.cols }, () => Array.from({ length: matrix.rows }, () => 0));
+  for (const entry of matrix.entries) {
+    columns[entry.col][entry.row] += entry.value;
+  }
+  return columns.map((column) => column.map(normalizeNumber));
+}
+function vectorSpanRank(vectors, ambientDimension) {
+  if (vectors.length === 0) {
+    return 0;
+  }
+  return rref(vectors, ambientDimension).rank;
+}
+function independentVectors(vectors, ambientDimension) {
+  const independent = [];
+  let rank = 0;
+  for (const vector of vectors) {
+    const nextRank = vectorSpanRank([...independent, vector], ambientDimension);
+    if (nextRank > rank) {
+      independent.push(vector);
+      rank = nextRank;
+    }
+  }
+  return independent;
+}
+function representativeTerms(vector, term) {
+  return vector.map((coefficient, index) => ({
+    coefficient: normalizeNumber(coefficient),
+    basisElement: term.basis[index]
+  })).filter((entry) => entry.coefficient !== 0);
+}
+function computeGroup(complex, degree, vertexTerm, degreeZeroDifferential) {
+  const term = degree === 0 ? vertexTerm : complex.terms.getAt(degree - 1);
+  const outgoing = degree === 0 ? degreeZeroDifferential : complex.coboundaries.getAt(degree - 1);
+  const incoming = degree === 0 ? { rows: term.dimension, cols: 0, entries: [] } : degree === 1 ? degreeZeroDifferential : complex.coboundaries.getAt(degree - 2);
+  const kernel = kernelBasis(outgoing);
+  const image = independentVectors(columnVectors(incoming), term.dimension);
+  const span = [...image];
+  let spanRank = vectorSpanRank(span, term.dimension);
+  const representatives = [];
+  for (const vector of kernel) {
+    const nextRank = vectorSpanRank([...span, vector], term.dimension);
+    if (nextRank > spanRank) {
+      span.push(vector);
+      spanRank = nextRank;
+      representatives.push({
+        vector,
+        terms: representativeTerms(vector, term)
+      });
+    }
+  }
+  return {
+    degree,
+    term,
+    kernelBasis: kernel,
+    imageBasis: image,
+    representatives,
+    dimension: representatives.length,
+    kernelDimension: kernel.length,
+    imageDimension: image.length
+  };
+}
+function buildHochschildCohomologyFromComplex(complex) {
+  const vertexTerm = buildVertexCochainTerm(complex);
+  const degreeZeroDifferential = buildDegreeZeroDifferential(complex, vertexTerm);
+  return {
+    groups: makeLazySequence2(assertNonNegativeCohomologyDegree, (degree) => computeGroup(complex, degree, vertexTerm, degreeZeroDifferential)),
+    complex,
+    field: "Q",
+    logs: ["Computing Hochschild cohomology over Q."]
+  };
+}
+
 // src/frontend/computation-controller.ts
 var DEFAULT_COMPUTE_TERM_BOUND = 5;
 var COMPUTATION_LOG_PREFIX = "[GAPCytoEx ambiguity]";
@@ -2895,9 +3367,12 @@ function buildMonomialComputationContext(state, quiver, maxPathLength) {
     return state.monomialComputationContext;
   }
   state.ambiguityGroupsByOrientation = null;
+  state.hochschildCochainComplex = null;
   state.hochschildComplex = null;
+  state.expandedHochschildDifferentials = new Set;
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   const verified = tidyUpRelationDataAlgebra({
     quiver,
     relations: state.relations,
@@ -2913,6 +3388,12 @@ function buildMonomialComputationContext(state, quiver, maxPathLength) {
     ambiguityComputation
   };
   return state.monomialComputationContext;
+}
+function getOrBuildHochschildCochainComplex(state, context) {
+  if (!state.hochschildCochainComplex) {
+    state.hochschildCochainComplex = buildHochschildCochainComplexFromContext(context);
+  }
+  return state.hochschildCochainComplex;
 }
 function formatAmbiguityWarningTerms(context) {
   return context.ambiguityComputation.warnings.flatMap((warning) => [
@@ -3022,7 +3503,7 @@ function computeAndRenderHochschildComplex(state) {
     const maxDegree = computeTermBoundValue();
     const logOnlyLastTerm = logOnlyLastTermValue();
     const context = buildMonomialComputationContext(state, quiver, maxPathLength);
-    const complex = buildHochschildCochainComplexFromContext(context);
+    const complex = getOrBuildHochschildCochainComplex(state, context);
     const terms = complex.terms.getArray(0, maxDegree);
     const coboundaries = maxDegree > 0 ? complex.coboundaries.getArray(0, maxDegree - 1) : [];
     const previousCheckedThrough = state.hochschildComplex?.checkedDifferentialThrough ?? -1;
@@ -3032,8 +3513,10 @@ function computeAndRenderHochschildComplex(state) {
     state.hochschildComplex = {
       terms: terms.map(([, term]) => term),
       coboundaries: coboundaries.map(([, matrix]) => matrix),
+      cohomologyGroups: undefined,
       checkedDifferentialThrough: Math.max(previousCheckedThrough, differentialCheck.checkedThroughDegree)
     };
+    state.expandedHochschildDifferentials = new Set;
     if (!state.ambiguityGroupsByOrientation) {
       storeAmbiguityGroups(state, context, maxDegree, logOnlyLastTerm);
       refreshAmbiguitiesOutput(state);
@@ -3067,6 +3550,68 @@ function computeAndRenderHochschildComplex(state) {
     }
     setError(error.message);
     setInfoStatus("Hochschild cochain computation failed.", true);
+  }
+}
+function computeAndRenderHochschildCohomology(state) {
+  const quiver = currentQuiver(state);
+  if (!quiver) {
+    setError("Draw a quiver before computing Hochschild cohomology.");
+    return;
+  }
+  try {
+    const maxPathLength = maxPathLengthValue();
+    const maxDegree = computeTermBoundValue();
+    const logOnlyLastTerm = logOnlyLastTermValue();
+    const context = buildMonomialComputationContext(state, quiver, maxPathLength);
+    const complex = getOrBuildHochschildCochainComplex(state, context);
+    const cohomology = buildHochschildCohomologyFromComplex(complex);
+    const groups = cohomology.groups.getArray(0, maxDegree);
+    const terms = complex.terms.getArray(0, maxDegree);
+    const coboundaries = maxDegree > 0 ? complex.coboundaries.getArray(0, maxDegree - 1) : [];
+    const differentialCheck = maxDegree > 0 ? checkHochschildDifferential(complex, 0, maxDegree - 1) : { ok: true, checkedThroughDegree: -1 };
+    state.hochschildComplex = {
+      terms: terms.map(([, term]) => term),
+      coboundaries: coboundaries.map(([, matrix]) => matrix),
+      cohomologyGroups: groups.map(([, group]) => group),
+      checkedDifferentialThrough: Math.max(state.hochschildComplex?.checkedDifferentialThrough ?? -1, differentialCheck.checkedThroughDegree)
+    };
+    state.expandedHochschildDifferentials = new Set;
+    if (!state.ambiguityGroupsByOrientation) {
+      storeAmbiguityGroups(state, context, maxDegree, logOnlyLastTerm);
+      refreshAmbiguitiesOutput(state);
+    }
+    refreshHochschildComplexOutput(state);
+    setRelationPanelTab(state, "hochschild-complex");
+    const ambiguityLogLines = [
+      `Ambiguities computed up to ${termCountText(maxDegree)}.`,
+      ...formatAmbiguityWarningTerms(context)
+    ];
+    const complexLogLines = [
+      `Hochschild cochain complex available through C^${maxDegree}.`,
+      differentialCheck.ok ? `Checked d^{i + 1} d^i = 0 for ${maxDegree > 0 ? `0 <= i <= ${maxDegree - 1}` : "no differential pairs"}.` : `WARNING: d is not a differential at index ${differentialCheck.failure?.degree}.`
+    ];
+    const cohomologyLogLines = [
+      `Hochschild cohomology computed through HH^${maxDegree}.`,
+      ...groups.map(([degree, group]) => `HH^${degree}: dimension ${group.dimension} (ker ${group.kernelDimension}, im ${group.imageDimension})`)
+    ];
+    appendLogGroups([
+      complex.logs,
+      monomialComputationLogs(context),
+      ambiguityLogLines,
+      complexLogLines,
+      cohomologyLogLines
+    ]);
+    if (!differentialCheck.ok) {
+      setInfoStatus("d is not a differential.", true);
+    }
+  } catch (error) {
+    if (error instanceof MonomialAlgebraError) {
+      appendWarningLogLines(error.logs.map((entry) => entry.message));
+      setInfoStatus("Relations are not monomial.", true);
+      return;
+    }
+    setError(error.message);
+    setInfoStatus("Hochschild cohomology computation failed.", true);
   }
 }
 
@@ -3120,6 +3665,32 @@ function promptBrauerStarRank() {
   }
   replaceQpaInput(buildBrauerStarQpa(rank));
 }
+function bindMaxPathLengthTooltip() {
+  const button = document.getElementById("maxPathLengthInfo");
+  const control = button?.closest(".max-path-control");
+  if (!button || !control) {
+    return;
+  }
+  const closeTooltip = () => {
+    control.classList.remove("is-tooltip-open");
+    button.setAttribute("aria-expanded", "false");
+  };
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isOpen = control.classList.toggle("is-tooltip-open");
+    button.setAttribute("aria-expanded", String(isOpen));
+  });
+  document.addEventListener("click", (event) => {
+    if (!control.contains(event.target)) {
+      closeTooltip();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      closeTooltip();
+    }
+  });
+}
 function replaceQpaInput(value) {
   const input = document.getElementById("inQuiver");
   if (input) {
@@ -3172,6 +3743,7 @@ function bindWorkbenchEvents(state) {
   bindClick("toQPABtn", () => translateToQpa(state));
   bindClick("computeAmbiguitiesBtn", () => computeAndRenderAmbiguities(state));
   bindClick("computeHochschildComplexBtn", () => computeAndRenderHochschildComplex(state));
+  bindClick("computeHochschildCohomologyBtn", () => computeAndRenderHochschildCohomology(state));
   bindClick("resetCanvasRelations", () => {
     clearAll(state);
     updateDrawButtonLabel();
@@ -3234,6 +3806,7 @@ function bindWorkbenchEvents(state) {
   lastDrawnQpaInput = currentQpaInputValue();
   setPathOrientation(state, state.activePathOrientation);
   setFieldCharacteristic(0, false);
+  bindMaxPathLengthTooltip();
   updateDrawButtonLabel();
   appendInfoLog("Ready.");
 }
@@ -3334,5 +3907,5 @@ maxPathLength?.addEventListener("input", () => {
 });
 bindWorkbenchEvents(state);
 
-//# debugId=25D734055D82898864756E2164756E21
+//# debugId=6AD420D39EE8CBF464756E2164756E21
 //# sourceMappingURL=app.js.map

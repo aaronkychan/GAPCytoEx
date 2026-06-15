@@ -1,6 +1,7 @@
 import type { RelationData } from "../backend/relations";
 import { underlyingPathOfAmbiguity, type Ambiguity } from "../backend/ambiguities";
 import type { CochainBasisElement, CochainSpace, SparseMatrix } from "../backend/chainCpx";
+import type { CohomologyClassRepresentative, HochschildCohomologyGroup } from "../backend/cohomology";
 import type { Path } from "../backend/paths";
 import {
   formatRelationData,
@@ -47,6 +48,10 @@ function hochschildBasisRowId(degree: number, index: number): string {
   return `hochschild-${degree}-${index}`;
 }
 
+function hochschildRepresentativeRowId(degree: number, index: number): string {
+  return `hochschild-rep-${degree}-${index}`;
+}
+
 function ambiguityByIndex(state: WorkbenchState, degree: number, index: number): Ambiguity | null {
   const groups = state.ambiguityGroupsByOrientation?.[state.activePathOrientation];
   const group = groups?.find((candidate) => candidate.degree === degree);
@@ -56,6 +61,11 @@ function ambiguityByIndex(state: WorkbenchState, degree: number, index: number):
 function hochschildBasisByIndex(state: WorkbenchState, degree: number, index: number): CochainBasisElement | null {
   const term = state.hochschildComplex?.terms.find((candidate) => candidate.degree === degree);
   return term?.basis[index] ?? null;
+}
+
+function hochschildRepresentativeByIndex(state: WorkbenchState, degree: number, index: number): CohomologyClassRepresentative | null {
+  const group = state.hochschildComplex?.cohomologyGroups?.find((candidate) => candidate.degree === degree);
+  return group?.representatives[index] ?? null;
 }
 
 function resetCanvasEdgeStyles(state: WorkbenchState): void {
@@ -187,9 +197,12 @@ export function refreshAmbiguitiesOutput(state: WorkbenchState): void {
 function clearAmbiguityResults(state: WorkbenchState): void {
   state.monomialComputationContext = null;
   state.ambiguityGroupsByOrientation = null;
+  state.hochschildCochainComplex = null;
   state.hochschildComplex = null;
+  state.expandedHochschildDifferentials = new Set();
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   state.relationPanelTab = "relations";
   refreshAmbiguitiesOutput(state);
   refreshHochschildComplexOutput(state);
@@ -212,7 +225,27 @@ function formatCoefficient(value: number, isFirst: boolean): string {
   return isFirst ? `${value} ` : `+ ${value} `;
 }
 
-function formatImageForColumn(matrix: SparseMatrix, target: CochainSpace, col: number): string {
+function formatDifferentialImageLines(matrix: SparseMatrix, target: CochainSpace, col: number): string[] {
+  const entries = matrix.entries.filter((entry) => entry.col === col);
+  if (entries.length === 0) {
+    return ["0"];
+  }
+  return entries.map((entry, index) => {
+    const basis = formatCochainBasisElement(target.basis[entry.row]);
+    if (entry.value === 1) {
+      return index === 0 ? `  ${basis}` : `+${basis}`;
+    }
+    if (entry.value === -1) {
+      return `-${basis}`;
+    }
+    if (entry.value > 0) {
+      return index === 0 ? `  ${entry.value} ${basis}` : `+${entry.value} ${basis}`;
+    }
+    return `${entry.value} ${basis}`;
+  });
+}
+
+function formatDifferentialImageInline(matrix: SparseMatrix, target: CochainSpace, col: number): string {
   const entries = matrix.entries.filter((entry) => entry.col === col);
   if (entries.length === 0) {
     return "0";
@@ -222,10 +255,122 @@ function formatImageForColumn(matrix: SparseMatrix, target: CochainSpace, col: n
     .join(" ");
 }
 
-function appendHochschildTerm(output: HTMLElement, state: WorkbenchState, term: CochainSpace, rowIndex: { value: number }): void {
+function closeDifferentialTooltips(): void {
+  document.querySelectorAll(".differential-tooltip-wrap.is-open").forEach((element) => element.classList.remove("is-open"));
+}
+
+function appendDifferentialButton(
+  container: HTMLElement,
+  label: string,
+  imageLines?: string[],
+  onClick?: () => void
+): void {
+  const wrap = document.createElement("span");
+  wrap.className = "differential-tooltip-wrap";
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "differential-chip";
+  button.textContent = label;
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (imageLines) {
+      const shouldOpen = !wrap.classList.contains("is-open");
+      closeDifferentialTooltips();
+      wrap.classList.toggle("is-open", shouldOpen);
+    }
+    onClick?.();
+  });
+  wrap.appendChild(button);
+
+  if (imageLines) {
+    const tooltip = document.createElement("span");
+    tooltip.className = "differential-tooltip";
+    imageLines.forEach((line) => {
+      const lineElement = document.createElement("span");
+      lineElement.textContent = line;
+      tooltip.appendChild(lineElement);
+    });
+    wrap.appendChild(tooltip);
+  }
+
+  container.appendChild(wrap);
+}
+
+function toggleExpandedDifferential(state: WorkbenchState, degree: number): void {
+  if (state.expandedHochschildDifferentials.has(degree)) {
+    state.expandedHochschildDifferentials.delete(degree);
+  } else {
+    state.expandedHochschildDifferentials.add(degree);
+  }
+  refreshHochschildComplexOutput(state);
+}
+
+function formatCohomologyRepresentative(representative: CohomologyClassRepresentative): string {
+  if (representative.terms.length === 0) {
+    return "0";
+  }
+  return representative.terms
+    .map((term, index) => `${formatCoefficient(term.coefficient, index === 0)}${formatCochainBasisElement(term.basisElement)}`)
+    .join(" ");
+}
+
+function appendCohomologySummary(output: HTMLElement, group: HochschildCohomologyGroup): void {
+  const summary = document.createElement("div");
+  summary.className = "hochschild-cohomology-summary";
+  summary.textContent = `HH^${group.degree}: dim=${group.dimension}`;
+  output.appendChild(summary);
+  const detail = document.createElement("div");
+  detail.className = "hochschild-cohomology-detail";
+  detail.textContent = `(dim ker=${group.kernelDimension}, dim im=${group.imageDimension})`;
+  output.appendChild(detail);
+}
+
+function appendCohomologyRepresentatives(
+  output: HTMLElement,
+  state: WorkbenchState,
+  group: HochschildCohomologyGroup,
+  rowIndex: { value: number }
+): void {
+  if (group.representatives.length === 0) {
+    return;
+  }
+  const heading = document.createElement("div");
+  heading.className = "ambiguity-degree hochschild-representative-heading";
+  heading.textContent = "Cohom. representative";
+  output.appendChild(heading);
+
+  group.representatives.forEach((representative, representativeIndex) => {
+    const row = document.createElement("div");
+    row.className = `hochschildRow cohomology-representative-row ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
+    row.dataset.hochschildRepresentativeId = hochschildRepresentativeRowId(group.degree, representativeIndex);
+    row.textContent = formatCohomologyRepresentative(representative);
+    row.addEventListener("click", () => selectHochschildRepresentative(state, group.degree, representativeIndex));
+    output.appendChild(row);
+    rowIndex.value += 1;
+  });
+}
+
+function appendHochschildTerm(
+  output: HTMLElement,
+  state: WorkbenchState,
+  term: CochainSpace,
+  target: CochainSpace | undefined,
+  matrix: SparseMatrix | undefined,
+  rowIndex: { value: number }
+): void {
   const heading = document.createElement("div");
   heading.className = "ambiguity-degree";
-  heading.textContent = `C^${term.degree} (${term.dimension})`;
+  heading.appendChild(document.createTextNode(`C^${term.degree} (dim=${term.dimension})`));
+  if (target && matrix) {
+    heading.appendChild(document.createTextNode("  "));
+    appendDifferentialButton(
+      heading,
+      matrix.entries.length === 0 ? `d^${term.degree} = 0` : `d^${term.degree}`,
+      undefined,
+      () => toggleExpandedDifferential(state, term.degree),
+    );
+  }
   output.appendChild(heading);
 
   if (term.basis.length === 0) {
@@ -236,27 +381,30 @@ function appendHochschildTerm(output: HTMLElement, state: WorkbenchState, term: 
     const row = document.createElement("div");
     row.className = `hochschildRow ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
     row.dataset.hochschildBasisId = hochschildBasisRowId(term.degree, basisIndex);
-    row.textContent = formatCochainBasisElement(basisElement);
+    row.appendChild(document.createTextNode(formatCochainBasisElement(basisElement)));
+    if (target && matrix) {
+      row.appendChild(document.createTextNode("  "));
+      const imageLines = formatDifferentialImageLines(matrix, target, basisIndex);
+      appendDifferentialButton(
+        row,
+        imageLines.length === 1 && imageLines[0] === "0" ? `d^${term.degree}↦0` : `d^${term.degree}`,
+        imageLines,
+      );
+    }
     row.addEventListener("click", () => selectHochschildBasis(state, term.degree, basisIndex));
     output.appendChild(row);
     rowIndex.value += 1;
   });
 }
 
-function appendHochschildDifferential(
+function appendExpandedHochschildDifferential(
   output: HTMLElement,
   source: CochainSpace,
   target: CochainSpace,
   matrix: SparseMatrix,
   rowIndex: { value: number }
 ): void {
-  const heading = document.createElement("div");
-  heading.className = "ambiguity-degree hochschild-differential-heading";
-  const hasNonzeroImage = matrix.entries.length > 0;
-  heading.textContent = hasNonzeroImage ? `d^${source.degree}` : `d^${source.degree} = 0`;
-  output.appendChild(heading);
-
-  if (source.basis.length === 0 || !hasNonzeroImage) {
+  if (source.basis.length === 0 || matrix.entries.length === 0) {
     return;
   }
 
@@ -266,7 +414,7 @@ function appendHochschildDifferential(
     }
     const row = document.createElement("div");
     row.className = `hochschildRow differential-row ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
-    row.textContent = `${formatCochainBasisElement(basisElement)} ↦ ${formatImageForColumn(matrix, target, col)}`;
+    row.textContent = `${formatCochainBasisElement(basisElement)} ↦ ${formatDifferentialImageInline(matrix, target, col)}`;
     output.appendChild(row);
     rowIndex.value += 1;
   });
@@ -280,21 +428,37 @@ export function refreshHochschildComplexOutput(state: WorkbenchState): void {
   }
   output.innerHTML = "";
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   const complex = state.hochschildComplex;
   if (!complex) {
     return;
   }
 
   const rowIndex = { value: 0 };
+  const cohomologyGroupsByDegree = new Map((complex.cohomologyGroups ?? []).map((group) => [group.degree, group]));
+  const hh0 = cohomologyGroupsByDegree.get(0);
+  if (hh0) {
+    const heading = document.createElement("div");
+    heading.className = "ambiguity-degree";
+    heading.textContent = `Vertex term k Gamma[-1]||B (dim=${hh0.term.dimension})`;
+    output.appendChild(heading);
+    appendCohomologySummary(output, hh0);
+    appendCohomologyRepresentatives(output, state, hh0, rowIndex);
+  }
   for (let index = 0; index < complex.terms.length; index += 1) {
-    if (index > 0) {
+    if (index > 0 || hh0) {
       output.appendChild(document.createElement("hr")).className = "ambiguity-divider";
     }
-    appendHochschildTerm(output, state, complex.terms[index], rowIndex);
     const nextTerm = complex.terms[index + 1];
     const differential = complex.coboundaries[index];
-    if (nextTerm && differential) {
-      appendHochschildDifferential(output, complex.terms[index], nextTerm, differential, rowIndex);
+    appendHochschildTerm(output, state, complex.terms[index], nextTerm, differential, rowIndex);
+    if (nextTerm && differential && state.expandedHochschildDifferentials.has(complex.terms[index].degree)) {
+      appendExpandedHochschildDifferential(output, complex.terms[index], nextTerm, differential, rowIndex);
+    }
+    const cohomologyGroup = cohomologyGroupsByDegree.get(complex.terms[index].degree + 1);
+    if (cohomologyGroup) {
+      appendCohomologySummary(output, cohomologyGroup);
+      appendCohomologyRepresentatives(output, state, cohomologyGroup, rowIndex);
     }
   }
 }
@@ -326,6 +490,7 @@ export function selectHochschildBasis(state: WorkbenchState, degree: number, ind
   state.selectedRelationIndex = -1;
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = hochschildBasisRowId(degree, index);
+  state.selectedHochschildRepresentativeId = null;
   clearRelationAnimation(state);
   resetCanvasEdgeStyles(state);
   document.querySelectorAll("#relOutput .relationRow").forEach((row) => row.classList.remove("selectedRelationRow"));
@@ -355,6 +520,62 @@ export function selectHochschildBasis(state: WorkbenchState, degree: number, ind
   });
   appendInfoLog(
     `Selecting basis ${formatCochainBasisElement(basisElement)} of the ${degree}-th term of Hochschild complex. (p displayed in orange/amber color, b displayed in blue/green color)`
+  );
+}
+
+export function selectHochschildRepresentative(state: WorkbenchState, degree: number, index: number): void {
+  const representative = hochschildRepresentativeByIndex(state, degree, index);
+  if (!representative) {
+    return;
+  }
+  state.selectedRelationIndex = -1;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = hochschildRepresentativeRowId(degree, index);
+  clearRelationAnimation(state);
+  resetCanvasEdgeStyles(state);
+  document.querySelectorAll("#relOutput .relationRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#hochschildComplexOutput .hochschildRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+
+  const representativeRow = document.querySelector(`#hochschildComplexOutput [data-hochschild-representative-id="${state.selectedHochschildRepresentativeId}"]`);
+  representativeRow?.classList.add("selectedRelationRow");
+
+  const displayedTermDegree = degree - 1;
+  if (displayedTermDegree >= 0) {
+    const displayedTerm = state.hochschildComplex?.terms.find((term) => term.degree === displayedTermDegree);
+    representative.terms.forEach((term) => {
+      const basisIndex = displayedTerm?.basis.indexOf(term.basisElement) ?? -1;
+      if (basisIndex >= 0) {
+        document
+          .querySelector(`#hochschildComplexOutput [data-hochschild-basis-id="${hochschildBasisRowId(displayedTermDegree, basisIndex)}"]`)
+          ?.classList.add("selectedRelationRow");
+      }
+    });
+  }
+
+  const pColor = relationHighlightColor(0);
+  const bColor = relationHighlightColor(1);
+  representative.terms.forEach((term) => {
+    underlyingPathOfAmbiguity(term.basisElement.ambiguity).arrows.forEach((arrow) => {
+      state.cy?.getElementById(arrow).style({
+        width: 4,
+        "line-color": pColor,
+        "target-arrow-color": pColor,
+        "target-arrow-shape": "triangle"
+      });
+    });
+    term.basisElement.basisPath.arrows.forEach((arrow) => {
+      state.cy?.getElementById(arrow).style({
+        width: 5,
+        "line-color": bColor,
+        "target-arrow-color": bColor,
+        "target-arrow-shape": "triangle"
+      });
+    });
+  });
+  appendInfoLog(
+    `Selecting representative HH^${degree}.${index + 1}. (p displayed in orange/amber color, b displayed in blue/green color; multiple summands are highlighted)`
   );
 }
 
@@ -416,6 +637,7 @@ export function refreshRelationsOutput(state: WorkbenchState): void {
   output.contentEditable = "false";
   state.selectedRelationIndex = -1;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
 
   state.relations.forEach((relation, index) => {
     const row = document.createElement("div");
@@ -552,6 +774,7 @@ export function selectRelation(state: WorkbenchState, index: number): void {
   state.selectedRelationIndex = index;
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   clearRelationAnimation(state);
   if (!state.cy) {
     return;

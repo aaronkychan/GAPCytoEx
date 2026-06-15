@@ -22,6 +22,8 @@
     --focus-ring: rgba(37, 99, 235, 0.18);
     --relation-color-primary: #ff6f00;
     --relation-color-secondary: #0080ff;
+    --cohomology-rep-color-primary: #b84f00;
+    --cohomology-rep-color-secondary: #0066cc;
     --shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
     --radius: 8px;
     --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
@@ -56,6 +58,8 @@ body[data-theme="dark"] {
     --focus-ring: rgba(96, 165, 250, 0.24);
     --relation-color-primary: #fbbf24;
     --relation-color-secondary: #86efac;
+    --cohomology-rep-color-primary: #f59e0b;
+    --cohomology-rep-color-secondary: #5eead4;
     --shadow: 0 16px 38px rgba(0, 0, 0, 0.32);
 }
 
@@ -1134,7 +1138,96 @@ input[type="button"]:hover:not(:disabled) {
 }
 
 .hochschild-differential-heading {
+  color: var(--muted);
+}
+
+.differential-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  vertical-align: baseline;
+}
+
+.differential-chip {
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 0.24rem;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  line-height: 1.05;
+  cursor: pointer;
+}
+
+.differential-chip:hover,
+.differential-chip:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  outline: none;
+}
+
+.differential-tooltip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 20;
+  display: none;
+  min-width: max-content;
+  max-width: min(36rem, 78vw);
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
   color: var(--text);
+  white-space: pre;
+}
+
+.differential-tooltip span {
+  display: block;
+  line-height: 1.35;
+}
+
+.differential-tooltip-wrap:hover .differential-tooltip,
+.differential-tooltip-wrap:focus-within .differential-tooltip,
+.differential-tooltip-wrap.is-open .differential-tooltip {
+  display: block;
+}
+
+.hochschild-cohomology-summary {
+  padding: 0.34rem 0.65rem 0.05rem;
+  color: var(--accent-strong);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.hochschild-cohomology-detail {
+  padding: 0.02rem 0.65rem 0.18rem 0.85rem;
+  color: var(--accent-strong);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+}
+
+.hochschild-representative-heading {
+  color: var(--accent-strong);
+}
+
+.cohomology-representative-row {
+  cursor: pointer;
+  padding-left: 0.85rem;
+}
+
+.cohomology-representative-row:hover {
+  background: var(--surface-strong);
+}
+
+.cohomology-representative-row.row-even {
+  color: var(--cohomology-rep-color-secondary);
+}
+
+.cohomology-representative-row.row-odd {
+  color: var(--cohomology-rep-color-primary);
 }
 
 .ambiguity-piece {
@@ -1607,9 +1700,69 @@ input[type="button"]:hover:not(:disabled) {
 }
 
 .monomial-title .max-path-control {
+  position: relative;
   grid-column: auto;
   margin: 0 0 0 auto;
   white-space: nowrap;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.monomial-title .max-path-control * {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.info-icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  min-width: 1.05rem;
+  min-height: 1.05rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: help;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0;
+}
+
+.info-icon-button:hover,
+.info-icon-button:focus-visible,
+.info-icon-button[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  outline: none;
+}
+
+.control-tooltip {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 20;
+  display: none;
+  width: min(18rem, 72vw);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 400;
+  line-height: 1.35;
+  padding: 0.55rem 0.65rem;
+  white-space: normal;
+}
+
+.max-path-control:hover .control-tooltip,
+.max-path-control:focus-within .control-tooltip,
+.max-path-control.is-tooltip-open .control-tooltip {
+  display: block;
 }
 
 .log-last-control {
@@ -1622,6 +1775,7 @@ input[type="button"]:hover:not(:disabled) {
 }
 
 .max-path-control input {
+  width: 3.8rem;
   font-size: 0.78rem;
   padding: 0.18rem 0.3rem;
 }

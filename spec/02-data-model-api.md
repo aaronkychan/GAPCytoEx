@@ -174,10 +174,26 @@ interface AmbiguityComputation {
 interface HochschildCochainComplex {
   terms: LazySequence<CochainSpace>;
   coboundaries: LazySequence<SparseMatrix>;
+  field: "Q";
+  admissiblePathEnumeration: AdmissiblePathEnumeration;
+  ambiguityComputation: AmbiguityComputation;
 }
 
 interface HochschildCohomology {
-  groups: LazySequence<CohomologyGroup>;
+  groups: LazySequence<HochschildCohomologyGroup>;
+  complex: HochschildCochainComplex;
+  field: "Q";
+}
+
+interface HochschildCohomologyGroup {
+  degree: number;
+  term: CochainSpace;
+  kernelBasis: number[][];
+  imageBasis: number[][];
+  representatives: CohomologyClassRepresentative[];
+  dimension: number;
+  kernelDimension: number;
+  imageDimension: number;
 }
 
 function computeLeftAmbiguitiesR2L(input: VerifiedMonomialAlgebra): AmbiguitySequence;
@@ -188,7 +204,9 @@ function computeAmbiguities(input: MonomialAlgebraInput): AmbiguityComputation;
 
 function buildHochschildCochainComplex(input: MonomialAlgebraInput): HochschildCochainComplex;
 
-function computeHochschildCohomology(input: MonomialAlgebraInput): HochschildCohomology;
+function buildHochschildCohomology(input: MonomialAlgebraInput): HochschildCohomology;
+
+function buildHochschildCohomologyFromComplex(complex: HochschildCochainComplex): HochschildCohomology;
 
 function computeCupProduct(input: MonomialAlgebraInput, maxDegree: number): CupProductResult;
 ```

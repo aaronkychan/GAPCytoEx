@@ -24,6 +24,7 @@ import {
   type Ambiguity
 } from "../src/backend/ambiguities";
 import { buildHochschildCochainComplex, checkHochschildDifferential } from "../src/backend/chainCpx";
+import { buildHochschildCohomology, buildHochschildCohomologyFromComplex } from "../src/backend/cohomology";
 
 test("reverseOrientation reverses word order without swapping source or target", () => {
   const path: Path = {
@@ -666,6 +667,26 @@ test("Hochschild lazy terms and coboundaries cache repeated getAt calls", () => 
   expect(differentialSecond).toBe(differentialFirst);
 });
 
+test("Hochschild cohomology lazy groups cache repeated getAt calls", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v" }],
+    arrows: [{ id: "a", source: "v", target: "v", label: "a" }]
+  };
+
+  const complex = buildHochschildCochainComplex({
+    quiver,
+    relations: [relationFromL2R("a2", pathFromArrowIdsL2R(quiver, ["a", "a"]))],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+  const cohomology = buildHochschildCohomologyFromComplex(complex);
+
+  const first = cohomology.groups.getAt(2);
+  const second = cohomology.groups.getAt(2);
+
+  expect(second).toBe(first);
+});
+
 test("Hochschild d zero for k loop modulo square accumulates formula 5.2 over rationals", () => {
   const quiver: Quiver = {
     vertices: [{ id: "v" }],
@@ -731,4 +752,31 @@ test("Hochschild coboundaries compose to zero on computed complex", () => {
     ok: true,
     checkedThroughDegree: 3
   });
+});
+
+test("[ALOS] rank-3 monomial example matches Example 5.5 Hochschild cohomology dimensions", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v1" }, { id: "v2" }, { id: "v3" }],
+    arrows: [
+      { id: "a", source: "v1", target: "v2", label: "a" },
+      { id: "b", source: "v1", target: "v3", label: "b" },
+      { id: "c", source: "v3", target: "v2", label: "c" },
+      { id: "z", source: "v2", target: "v1", label: "z" }
+    ]
+  };
+
+  const cohomology = buildHochschildCohomology({
+    quiver,
+    relations: [
+      relationFromL2R("zb", pathFromArrowIdsL2R(quiver, ["z", "b"])),
+      relationFromL2R("cz", pathFromArrowIdsL2R(quiver, ["c", "z"])),
+      relationFromL2R("aza", pathFromArrowIdsL2R(quiver, ["a", "z", "a"])),
+      relationFromL2R("zaz", pathFromArrowIdsL2R(quiver, ["z", "a", "z"]))
+    ],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+
+  const expectedDimensions = [3, 3, 2, 2, 3, 3, 2, 2, 3];
+  expect(cohomology.groups.getArray(0, expectedDimensions.length - 1).map(([, group]) => group.dimension)).toEqual(expectedDimensions);
 });

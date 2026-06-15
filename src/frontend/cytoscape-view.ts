@@ -219,9 +219,12 @@ export function presentData(
     state.relations = relations;
     state.monomialComputationContext = null;
     state.ambiguityGroupsByOrientation = null;
+    state.hochschildCochainComplex = null;
     state.hochschildComplex = null;
+    state.expandedHochschildDifferentials = new Set();
     state.selectedAmbiguityId = null;
     state.selectedHochschildBasisId = null;
+    state.selectedHochschildRepresentativeId = null;
     state.relationPanelTab = "relations";
     refreshRelationsOutput(state);
     ["saveSVG", "fixCyto", "wriggle", "toQPABtn"].forEach((id) => {
@@ -308,9 +311,12 @@ export function doubleQuiver(state: WorkbenchState): void {
     if (reverseArrows.length > 0) {
         state.monomialComputationContext = null;
         state.ambiguityGroupsByOrientation = null;
+        state.hochschildCochainComplex = null;
         state.hochschildComplex = null;
+        state.expandedHochschildDifferentials = new Set();
         state.selectedAmbiguityId = null;
         state.selectedHochschildBasisId = null;
+        state.selectedHochschildRepresentativeId = null;
         state.relationPanelTab = "relations";
         refreshRelationsOutput(state);
         state.cy.add(reverseArrows);
@@ -334,9 +340,12 @@ export function clearAll(state: WorkbenchState): void {
     state.relations = [];
     state.monomialComputationContext = null;
     state.ambiguityGroupsByOrientation = null;
+    state.hochschildCochainComplex = null;
     state.hochschildComplex = null;
+    state.expandedHochschildDifferentials = new Set();
     state.selectedAmbiguityId = null;
     state.selectedHochschildBasisId = null;
+    state.selectedHochschildRepresentativeId = null;
     state.relationPanelTab = "relations";
     state.cy = null;
     const quiverInput = document.getElementById(

@@ -33,7 +33,8 @@ Stage 3: Hochschild cochain complex
 Stage 4: Hochschild cohomology
 
 - Compute degreewise Hochschild cohomology from the approved Hochschild cochain complex.
-- Add output rendering for cohomology groups and selected representatives.
+- Insert the vertex cochain term `k Gamma[-1] || B` for `HH^0`; for positive degrees, use the displayed Hochschild cochain complex with the documented one-degree shift.
+- Add Info/Log output for cohomology group dimensions and retain backend representatives for later richer UI rendering.
 - Human check required before Stage 5.
 
 Stage 5: cup product UI design, implementation, and visualization

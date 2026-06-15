@@ -2,7 +2,8 @@ import type { RelationData } from "../backend/relations";
 import type { CytoscapeElementData } from "../backend/qpa-translator";
 import type { PathOrientation } from "../backend/paths";
 import type { Ambiguity } from "../backend/ambiguities";
-import type { CochainSpace, HochschildCochainComplexContext, SparseMatrix } from "../backend/chainCpx";
+import type { CochainSpace, HochschildCochainComplex, HochschildCochainComplexContext, SparseMatrix } from "../backend/chainCpx";
+import type { HochschildCohomologyGroup } from "../backend/cohomology";
 
 export type EditMode = "default" | "add" | "rename" | "delete";
 export type RelationPanelTab = "relations" | "ambiguities" | "hochschild-complex";
@@ -15,6 +16,7 @@ export interface AmbiguityDegreeGroup {
 export interface HochschildComplexDisplayData {
   terms: CochainSpace[];
   coboundaries: SparseMatrix[];
+  cohomologyGroups?: HochschildCohomologyGroup[];
   checkedDifferentialThrough: number;
 }
 
@@ -34,9 +36,12 @@ export interface WorkbenchState {
   activeFieldCharacteristic: number;
   monomialComputationContext: HochschildCochainComplexContext | null;
   ambiguityGroupsByOrientation: Record<PathOrientation, AmbiguityDegreeGroup[]> | null;
+  hochschildCochainComplex: HochschildCochainComplex | null;
   hochschildComplex: HochschildComplexDisplayData | null;
+  expandedHochschildDifferentials: Set<number>;
   selectedAmbiguityId: string | null;
   selectedHochschildBasisId: string | null;
+  selectedHochschildRepresentativeId: string | null;
   relationPanelTab: RelationPanelTab;
 }
 
@@ -57,9 +62,12 @@ export function createWorkbenchState(): WorkbenchState {
     activeFieldCharacteristic: 0,
     monomialComputationContext: null,
     ambiguityGroupsByOrientation: null,
+    hochschildCochainComplex: null,
     hochschildComplex: null,
+    expandedHochschildDifferentials: new Set(),
     selectedAmbiguityId: null,
     selectedHochschildBasisId: null,
+    selectedHochschildRepresentativeId: null,
     relationPanelTab: "relations"
   };
 }

@@ -8,6 +8,7 @@ import {
   checkHochschildDifferential,
   type HochschildCochainComplexContext
 } from "../backend/chainCpx";
+import { buildHochschildCohomologyFromComplex } from "../backend/cohomology";
 import type { PathOrientation } from "../backend/paths";
 import {
   enumerateAdmissiblePathsFromVerified,
@@ -87,9 +88,12 @@ function buildMonomialComputationContext(state: WorkbenchState, quiver: Quiver, 
     return state.monomialComputationContext;
   }
   state.ambiguityGroupsByOrientation = null;
+  state.hochschildCochainComplex = null;
   state.hochschildComplex = null;
+  state.expandedHochschildDifferentials = new Set();
   state.selectedAmbiguityId = null;
   state.selectedHochschildBasisId = null;
+  state.selectedHochschildRepresentativeId = null;
   const verified = tidyUpRelationDataAlgebra({
     quiver,
     relations: state.relations,
@@ -105,6 +109,13 @@ function buildMonomialComputationContext(state: WorkbenchState, quiver: Quiver, 
     ambiguityComputation
   };
   return state.monomialComputationContext;
+}
+
+function getOrBuildHochschildCochainComplex(state: WorkbenchState, context: HochschildCochainComplexContext) {
+  if (!state.hochschildCochainComplex) {
+    state.hochschildCochainComplex = buildHochschildCochainComplexFromContext(context);
+  }
+  return state.hochschildCochainComplex;
 }
 
 function formatAmbiguityWarningTerms(context: HochschildCochainComplexContext): string[] {
@@ -225,7 +236,7 @@ export function computeAndRenderHochschildComplex(state: WorkbenchState): void {
     const maxDegree = computeTermBoundValue();
     const logOnlyLastTerm = logOnlyLastTermValue();
     const context = buildMonomialComputationContext(state, quiver, maxPathLength);
-    const complex = buildHochschildCochainComplexFromContext(context);
+    const complex = getOrBuildHochschildCochainComplex(state, context);
     const terms = complex.terms.getArray(0, maxDegree);
     const coboundaries = maxDegree > 0 ? complex.coboundaries.getArray(0, maxDegree - 1) : [];
     const previousCheckedThrough = state.hochschildComplex?.checkedDifferentialThrough ?? -1;
@@ -237,8 +248,10 @@ export function computeAndRenderHochschildComplex(state: WorkbenchState): void {
     state.hochschildComplex = {
       terms: terms.map(([, term]) => term),
       coboundaries: coboundaries.map(([, matrix]) => matrix),
+      cohomologyGroups: undefined,
       checkedDifferentialThrough: Math.max(previousCheckedThrough, differentialCheck.checkedThroughDegree)
     };
+    state.expandedHochschildDifferentials = new Set();
     if (!state.ambiguityGroupsByOrientation) {
       storeAmbiguityGroups(state, context, maxDegree, logOnlyLastTerm);
       refreshAmbiguitiesOutput(state);
@@ -274,5 +287,80 @@ export function computeAndRenderHochschildComplex(state: WorkbenchState): void {
     }
     setError((error as Error).message);
     setInfoStatus("Hochschild cochain computation failed.", true);
+  }
+}
+
+export function computeAndRenderHochschildCohomology(state: WorkbenchState): void {
+  const quiver = currentQuiver(state);
+  if (!quiver) {
+    setError("Draw a quiver before computing Hochschild cohomology.");
+    return;
+  }
+
+  try {
+    const maxPathLength = maxPathLengthValue();
+    const maxDegree = computeTermBoundValue();
+    const logOnlyLastTerm = logOnlyLastTermValue();
+    const context = buildMonomialComputationContext(state, quiver, maxPathLength);
+    const complex = getOrBuildHochschildCochainComplex(state, context);
+    const cohomology = buildHochschildCohomologyFromComplex(complex);
+    const groups = cohomology.groups.getArray(0, maxDegree);
+    const terms = complex.terms.getArray(0, maxDegree);
+    const coboundaries = maxDegree > 0 ? complex.coboundaries.getArray(0, maxDegree - 1) : [];
+    const differentialCheck = maxDegree > 0
+      ? checkHochschildDifferential(complex, 0, maxDegree - 1)
+      : { ok: true, checkedThroughDegree: -1 };
+
+    state.hochschildComplex = {
+      terms: terms.map(([, term]) => term),
+      coboundaries: coboundaries.map(([, matrix]) => matrix),
+      cohomologyGroups: groups.map(([, group]) => group),
+      checkedDifferentialThrough: Math.max(
+        state.hochschildComplex?.checkedDifferentialThrough ?? -1,
+        differentialCheck.checkedThroughDegree,
+      )
+    };
+    state.expandedHochschildDifferentials = new Set();
+    if (!state.ambiguityGroupsByOrientation) {
+      storeAmbiguityGroups(state, context, maxDegree, logOnlyLastTerm);
+      refreshAmbiguitiesOutput(state);
+    }
+    refreshHochschildComplexOutput(state);
+    setRelationPanelTab(state, "hochschild-complex");
+
+    const ambiguityLogLines = [
+      `Ambiguities computed up to ${termCountText(maxDegree)}.`,
+      ...formatAmbiguityWarningTerms(context)
+    ];
+    const complexLogLines = [
+      `Hochschild cochain complex available through C^${maxDegree}.`,
+      differentialCheck.ok
+        ? `Checked d^{i + 1} d^i = 0 for ${maxDegree > 0 ? `0 <= i <= ${maxDegree - 1}` : "no differential pairs"}.`
+        : `WARNING: d is not a differential at index ${differentialCheck.failure?.degree}.`
+    ];
+    const cohomologyLogLines = [
+      `Hochschild cohomology computed through HH^${maxDegree}.`,
+      ...groups.map(([degree, group]) =>
+        `HH^${degree}: dimension ${group.dimension} (ker ${group.kernelDimension}, im ${group.imageDimension})`,
+      )
+    ];
+    appendLogGroups([
+      complex.logs,
+      monomialComputationLogs(context),
+      ambiguityLogLines,
+      complexLogLines,
+      cohomologyLogLines
+    ]);
+    if (!differentialCheck.ok) {
+      setInfoStatus("d is not a differential.", true);
+    }
+  } catch (error) {
+    if (error instanceof MonomialAlgebraError) {
+      appendWarningLogLines(error.logs.map((entry) => entry.message));
+      setInfoStatus("Relations are not monomial.", true);
+      return;
+    }
+    setError((error as Error).message);
+    setInfoStatus("Hochschild cohomology computation failed.", true);
   }
 }
