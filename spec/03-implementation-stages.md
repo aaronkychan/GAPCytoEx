@@ -18,7 +18,7 @@ Stage 2: ambiguity computation and visualization
 - Implement `computeLeftAmbiguitiesR2L`.
 - Implement `computeRightAmbiguitiesL2R` as the development cross-check.
 - Compare both ambiguity conventions via `reverseOrientationOfAmbiguity`.
-- Show orientation mismatch warnings in `InfoPanel` and `OutputPanel`.
+- Show orientation mismatch warnings in the visible Info/Log textbox.
 - Implement clickable ambiguity rows and path-piece animation.
 - Human check required before Stage 3.
 

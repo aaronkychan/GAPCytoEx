@@ -36,7 +36,8 @@ Backend tests:
 - `underlyingPathOfAmbiguity` concatenates ambiguity pieces correctly, including length-zero vertex paths;
 - minimal relation antichain minimising;
 - empty relation lists produce populated `Gamma[-1]` and `Gamma[0]`, with empty `Gamma[n]` for every `n >= 1`;
-- lazy ambiguity, Hochschild cochain term, coboundary, and cohomology sequences compute only requested degrees and cache repeated `getAt(n)` calls;
+- lazy ambiguity, Hochschild cochain term, and coboundary sequences compute only requested degrees and cache repeated `getAt(n)` calls;
+- delayable Stage 4 TODO: once Hochschild cohomology exists, test that cohomology `groups.getAt(d)` caches repeated degree requests and reuses the needed Hochschild cochain data;
 - `getArray(start, endInclusive)` returns the same data as repeated cached `getAt(n)` calls over that interval;
 - admissible basis enumeration and finite-dimensional failure path;
 - ambiguity sets for hand-computed examples;
@@ -55,7 +56,7 @@ Frontend tests:
 - relation builder only allows composable next arrows;
 - path-orientation control switches relation and ambiguity display between `L2R` and `R2L` without mutating Cytoscape edge direction or GAP/QPA export output;
 - path-orientation control can switch after relations, output rows, and a selected ambiguity already exist, preserving graph, relation list, output content, and selection;
-- `maxPathLength` is visible in the computation controls, defaults to `50`, rejects values below `20`, and blocks computation with an `InfoPanel` warning when invalid;
+- `maxPathLength` is visible in the computation controls, defaults to `50`, rejects values below `20`, and blocks computation with a compact summary warning when invalid;
 - relation save disabled for paths of length 0 or 1;
 - confirm accepts a valid quiver with no listed relations;
 - deleting/renaming arrows updates or removes affected relations;
@@ -74,10 +75,14 @@ Visual QA:
 
 ## Open Questions Requiring Resolution
 
-1. Which field should v1 implement first: rationals, prime finite fields `F_p`, or both?
+1. Prime finite fields `F_p` remain deferred; v1 Hochschild cochain-complex computation uses rational coefficients.
 2. Should the frontend be rebuilt as a Vite/React TypeScript app, or kept as a vanilla TypeScript app compiled into the existing two-file style?
 3. After `Confirm monomial algebra`, should graph editing be locked, or should edits be allowed while marking computations stale?
 4. Should QPA text import remain fully supported, or only be preserved as a best-effort legacy import/export path?
+
+## Delayable TODOs
+
+- Consider hardening frontend computation-context reuse with an input fingerprint. Current UI mutation paths clear cached monomial/Hochschild data when the quiver or relations change; a fingerprint would additionally compare the current vertices, arrows, relations, field, and `maxPathLength` before reusing cached computation state.
 
 ## Non-Goals for v1
 

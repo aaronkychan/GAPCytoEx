@@ -14,8 +14,11 @@ function createWorkbenchState() {
     animationTimer: null,
     activePathOrientation: "L2R",
     activeFieldCharacteristic: 0,
+    monomialComputationContext: null,
     ambiguityGroupsByOrientation: null,
+    hochschildComplex: null,
     selectedAmbiguityId: null,
+    selectedHochschildBasisId: null,
     relationPanelTab: "relations"
   };
 }
@@ -372,10 +375,19 @@ R:=${relationText};`;
 }
 
 // src/frontend/log-panel.ts
+function scrollLogToBottom(output) {
+  output.scrollTop = output.scrollHeight;
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => {
+      output.scrollTop = output.scrollHeight;
+    });
+  }
+}
 function setOutputHtml(html) {
   const output = document.getElementById("outTxtBox");
   if (output) {
     output.innerHTML = html;
+    scrollLogToBottom(output);
   }
 }
 function appendLogDivider(output) {
@@ -393,6 +405,7 @@ function appendOutputHtml(html) {
   entry.innerHTML = html;
   output.appendChild(entry);
   appendLogDivider(output);
+  scrollLogToBottom(output);
 }
 function setError(message) {
   setOutputHtml(`<span style='color:red; font-size: 20pt'>${message}</span>`);
@@ -414,6 +427,7 @@ function appendInfoLog(message) {
   line.textContent = message;
   output.appendChild(line);
   appendLogDivider(output);
+  scrollLogToBottom(output);
 }
 function characteristicText(characteristic) {
   return characteristic === 0 ? "Characteristic 0 (real)" : `Characteristic ${characteristic}`;
@@ -429,923 +443,6 @@ function setFieldCharacteristic(characteristic, shouldLog = false) {
   }
 }
 
-// src/frontend/cytoscape-style.ts
-function activeTheme() {
-  return document.body.dataset.theme === "dark" ? "dark" : "light";
-}
-function cytoThemeColors(theme = activeTheme()) {
-  return theme === "dark" ? {
-    nodeFill: "#111827",
-    nodeBorder: "#cbd5e1",
-    nodeText: "#e5edf7",
-    selectedNode: "#f87171",
-    edge: "#d1d5db",
-    selectedEdge: "#93c5fd",
-    edgeLabel: "#fca5a5",
-    edgeLabelOutline: "#1f2937"
-  } : {
-    nodeFill: "#ffffff",
-    nodeBorder: "#000000",
-    nodeText: "#000000",
-    selectedNode: "#fa5252",
-    edge: "#000000",
-    selectedEdge: "#7379f4",
-    edgeLabel: "#ff1818",
-    edgeLabelOutline: "#eeee00"
-  };
-}
-function relationHighlightColor(index) {
-  return activeTheme() === "dark" ? index % 2 === 0 ? "#fbbf24" : "#86efac" : index % 2 === 0 ? "#ff6f00" : "#0080ff";
-}
-function coloredEdgeStyle(color) {
-  return {
-    width: 2,
-    "line-color": color,
-    "target-arrow-color": color,
-    "target-arrow-shape": "triangle",
-    "curve-style": "bezier",
-    "loop-direction": "0deg",
-    "loop-sweep": "45deg"
-  };
-}
-function cytoStyle(theme = activeTheme()) {
-  const colors = cytoThemeColors(theme);
-  return [
-    {
-      selector: "node",
-      style: {
-        width: 25,
-        height: 25,
-        shape: "ellipse",
-        "background-color": colors.nodeFill,
-        "border-width": "1px",
-        "border-style": "solid",
-        "border-color": colors.nodeBorder,
-        color: colors.nodeText,
-        content: "data(id)",
-        "text-valign": "center",
-        "text-halign": "center"
-      }
-    },
-    {
-      selector: "node:selected",
-      style: {
-        "background-color": colors.selectedNode,
-        width: 30,
-        height: 30
-      }
-    },
-    { selector: "edge", style: coloredEdgeStyle(colors.edge) },
-    { selector: "edge:selected", style: coloredEdgeStyle(colors.selectedEdge) },
-    {
-      selector: "edge[label]",
-      style: {
-        label: "data(label)",
-        color: colors.edgeLabel,
-        "font-size": "22pt",
-        "font-weight": "bold",
-        "text-outline-color": colors.edgeLabelOutline,
-        "text-outline-width": 2
-      }
-    }
-  ];
-}
-
-// src/frontend/relation-ui.ts
-function formatPathWord(arrows) {
-  return arrows.join("·");
-}
-function formatAmbiguityPiece(piece) {
-  if (piece.arrows.length === 0) {
-    return `(${piece.target})`;
-  }
-  return formatPathWord(piece.arrows);
-}
-function ambiguityRowId(degree, index) {
-  return `ambiguity-${degree}-${index}`;
-}
-function ambiguityByIndex(state, degree, index) {
-  const groups = state.ambiguityGroupsByOrientation?.[state.activePathOrientation];
-  const group = groups?.find((candidate) => candidate.degree === degree);
-  return group?.ambiguities[index] ?? null;
-}
-function resetCanvasEdgeStyles(state) {
-  if (!state.cy) {
-    return;
-  }
-  const colors = cytoThemeColors();
-  for (const edge of state.cy.edges()) {
-    edge.style({
-      width: 2,
-      "line-color": colors.edge,
-      "target-arrow-color": colors.edge,
-      "target-arrow-shape": "triangle"
-    });
-    edge.removeStyle("line-fill line-gradient-stop-colors line-gradient-stop-positions");
-  }
-}
-function setAmbiguityPieceClasses(row, currentPieceIndex, highlightedPieceIndexes) {
-  row?.querySelectorAll(".ambiguity-piece").forEach((piece) => {
-    const pieceIndex = Number(piece.dataset.pieceIndex ?? "-1");
-    piece.classList.toggle("is-pair-highlighted", highlightedPieceIndexes.has(pieceIndex));
-    piece.classList.toggle("is-flow-current", pieceIndex === currentPieceIndex);
-  });
-}
-function renderAmbiguityRowContents(row, ambiguity) {
-  row.textContent = "";
-  ambiguity.pieces.forEach((piece, pieceIndex) => {
-    if (pieceIndex > 0) {
-      row.appendChild(document.createTextNode(" | "));
-    }
-    const pieceElement = document.createElement("span");
-    pieceElement.className = "ambiguity-piece";
-    pieceElement.dataset.pieceIndex = String(pieceIndex);
-    pieceElement.textContent = formatAmbiguityPiece(piece);
-    row.appendChild(pieceElement);
-  });
-}
-function setRelationPanelTab(state, tab) {
-  if (tab === "ambiguities" && !state.ambiguityGroupsByOrientation) {
-    tab = "relations";
-  }
-  state.relationPanelTab = tab;
-  document.querySelectorAll("[data-relation-panel-tab]").forEach((button) => {
-    button.setAttribute("aria-pressed", button.dataset.relationPanelTab === tab ? "true" : "false");
-  });
-  const relationPanel = document.getElementById("relationsTabPanel");
-  const ambiguityPanel = document.getElementById("ambiguitiesTabPanel");
-  if (relationPanel) {
-    relationPanel.hidden = tab !== "relations";
-  }
-  if (ambiguityPanel) {
-    ambiguityPanel.hidden = tab !== "ambiguities";
-  }
-}
-function refreshRelationPanelTabs(state) {
-  const ambiguityButton = document.getElementById("ambiguitiesTabButton");
-  const hasAmbiguities = state.ambiguityGroupsByOrientation !== null;
-  if (ambiguityButton) {
-    ambiguityButton.hidden = !hasAmbiguities;
-  }
-  setRelationPanelTab(state, hasAmbiguities ? state.relationPanelTab : "relations");
-}
-function refreshAmbiguitiesOutput(state) {
-  refreshRelationPanelTabs(state);
-  const output = document.getElementById("ambiguityOutput");
-  if (!output) {
-    return;
-  }
-  output.innerHTML = "";
-  state.selectedAmbiguityId = null;
-  const groups = state.ambiguityGroupsByOrientation?.[state.activePathOrientation];
-  if (!groups) {
-    return;
-  }
-  let rowIndex = 0;
-  for (const [groupIndex, group] of groups.entries()) {
-    if (groupIndex > 0) {
-      output.appendChild(document.createElement("hr")).className = "ambiguity-divider";
-    }
-    const heading = document.createElement("div");
-    heading.className = "ambiguity-degree";
-    heading.textContent = `Gamma[${group.degree}] (${group.ambiguities.length})`;
-    output.appendChild(heading);
-    if (group.ambiguities.length === 0) {
-      const empty = document.createElement("div");
-      empty.className = "ambiguityRow row-even";
-      empty.textContent = "(empty)";
-      output.appendChild(empty);
-      rowIndex += 1;
-      continue;
-    }
-    group.ambiguities.forEach((ambiguity, ambiguityIndex) => {
-      const row = document.createElement("div");
-      row.className = `ambiguityRow ${rowIndex % 2 === 0 ? "row-even" : "row-odd"}`;
-      row.dataset.ambiguityId = ambiguityRowId(group.degree, ambiguityIndex);
-      renderAmbiguityRowContents(row, ambiguity);
-      row.addEventListener("click", () => selectAmbiguity(state, group.degree, ambiguityIndex));
-      output.appendChild(row);
-      rowIndex += 1;
-    });
-  }
-}
-function clearAmbiguityResults(state) {
-  state.ambiguityGroupsByOrientation = null;
-  state.selectedAmbiguityId = null;
-  state.relationPanelTab = "relations";
-  refreshAmbiguitiesOutput(state);
-}
-function selectAmbiguity(state, degree, index) {
-  const ambiguity = ambiguityByIndex(state, degree, index);
-  if (!ambiguity) {
-    return;
-  }
-  state.selectedRelationIndex = -1;
-  state.selectedAmbiguityId = ambiguityRowId(degree, index);
-  clearRelationAnimation(state);
-  resetCanvasEdgeStyles(state);
-  document.querySelectorAll("#relOutput .relationRow").forEach((row2) => row2.classList.remove("selectedRelationRow"));
-  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row2) => row2.classList.remove("selectedRelationRow"));
-  document.querySelectorAll("#ambiguityOutput .ambiguity-piece").forEach((piece) => piece.classList.remove("is-pair-highlighted", "is-flow-current"));
-  const row = document.querySelector(`#ambiguityOutput [data-ambiguity-id="${state.selectedAmbiguityId}"]`);
-  row?.classList.add("selectedRelationRow");
-  animateAmbiguity(state, ambiguity, row);
-}
-function validateRelationArrowReferences(relations, cyInstance) {
-  if (!cyInstance) {
-    return true;
-  }
-  const arrows = new Set(cyInstance.edges().map((edge) => edge.id()));
-  const missing = [...relationArrowNames(relations)].filter((name) => !arrows.has(name));
-  if (missing.length > 0) {
-    setError(`Relations refer to unknown arrow(s): ${[...new Set(missing)].join(", ")}`);
-    return false;
-  }
-  return true;
-}
-function renameArrowInRelations(oldName, newName, relations, cyInstance, state) {
-  if (!relations.length) {
-    return false;
-  }
-  let renamed = false;
-  for (const relation of relations) {
-    if (!relation.terms) {
-      continue;
-    }
-    let relationChanged = false;
-    for (const term of relation.terms) {
-      for (let index = 0;index < term.monomial.length; index += 1) {
-        if (term.monomial[index] === oldName) {
-          term.monomial[index] = newName;
-          relationChanged = true;
-          renamed = true;
-        }
-      }
-    }
-    if (relationChanged) {
-      relation.reln = formatRelationData(relation);
-    }
-  }
-  if (renamed) {
-    clearAmbiguityResults(state);
-    validateRelationArrowReferences(relations, cyInstance);
-    refreshRelationsOutput(state);
-  }
-  return renamed;
-}
-function refreshRelationsOutput(state) {
-  state.addRelationMode = false;
-  refreshRelationPanelTabs(state);
-  const output = document.getElementById("relOutput");
-  if (!output) {
-    return;
-  }
-  output.innerHTML = "";
-  output.classList.remove("add-relation-mode");
-  output.contentEditable = "false";
-  state.selectedRelationIndex = -1;
-  state.relations.forEach((relation, index) => {
-    const row = document.createElement("div");
-    row.classList.add("relationRow");
-    row.contentEditable = "false";
-    row.setAttribute("id", relation.reln ?? formatRelationData(relation));
-    row.innerHTML = formatRelationData(relation, state.activePathOrientation);
-    row.addEventListener("click", () => selectRelation(state, index));
-    output.appendChild(row);
-  });
-  const addButton = document.getElementById("btnAddReln");
-  if (addButton) {
-    addButton.value = "Add relation(s)";
-  }
-}
-function applyPathOrientationLabel(state) {
-  document.querySelectorAll("[data-orientation]").forEach((button) => {
-    button.setAttribute("aria-pressed", button.dataset.orientation === state.activePathOrientation ? "true" : "false");
-  });
-}
-function setPathOrientation(state, orientation) {
-  if (orientation !== "L2R" && orientation !== "R2L") {
-    return;
-  }
-  if (orientation === state.activePathOrientation) {
-    applyPathOrientationLabel(state);
-    return;
-  }
-  const relationToSelect = state.selectedRelationIndex;
-  state.activePathOrientation = orientation;
-  applyPathOrientationLabel(state);
-  refreshRelationsOutput(state);
-  refreshAmbiguitiesOutput(state);
-  if (state.cy && relationToSelect >= 0 && relationToSelect < state.relations.length) {
-    selectRelation(state, relationToSelect);
-  }
-}
-function clearRelationAnimation(state) {
-  if (!state.animationTimer) {
-    return;
-  }
-  clearInterval(state.animationTimer);
-  state.animationTimer = null;
-}
-function animateAmbiguity(state, ambiguity, row) {
-  if (!state.cy) {
-    return;
-  }
-  const nonVertexPieces = ambiguity.pieces.map((piece, pieceIndex) => ({ piece, pieceIndex })).filter(({ piece }) => piece.arrows.length > 0);
-  if (nonVertexPieces.length < 2) {
-    const onlyPiece = nonVertexPieces[0];
-    setAmbiguityPieceClasses(row, onlyPiece?.pieceIndex ?? -1, new Set(onlyPiece ? [onlyPiece.pieceIndex] : []));
-    return;
-  }
-  const color = relationHighlightColor(Math.max(0, ambiguity.n));
-  const flowColor = "#dafd13";
-  const stepsPerArrow = 36;
-  let step = 0;
-  const totalArrows = nonVertexPieces.reduce((sum, { piece }) => sum + piece.arrows.length, 0);
-  const totalSteps = Math.max(1, totalArrows * stepsPerArrow);
-  state.animationTimer = setInterval(() => {
-    resetCanvasEdgeStyles(state);
-    const currentArrowOffset = Math.min(totalArrows - 1, Math.floor(step / stepsPerArrow));
-    let consumedArrows = 0;
-    let currentPiecePosition = 0;
-    for (let index = 0;index < nonVertexPieces.length; index += 1) {
-      const pieceLength = nonVertexPieces[index].piece.arrows.length;
-      if (currentArrowOffset < consumedArrows + pieceLength) {
-        currentPiecePosition = index;
-        break;
-      }
-      consumedArrows += pieceLength;
-    }
-    const currentPiece = nonVertexPieces[currentPiecePosition];
-    const nextPiece = nonVertexPieces[currentPiecePosition + 1];
-    const highlightedPieceIndexes = new Set([currentPiece.pieceIndex]);
-    if (nextPiece) {
-      highlightedPieceIndexes.add(nextPiece.pieceIndex);
-    }
-    setAmbiguityPieceClasses(row, currentPiece.pieceIndex, highlightedPieceIndexes);
-    const highlightedArrows = new Set;
-    for (const { pieceIndex, piece } of nonVertexPieces) {
-      if (highlightedPieceIndexes.has(pieceIndex)) {
-        piece.arrows.forEach((arrow) => highlightedArrows.add(arrow));
-      }
-    }
-    highlightedArrows.forEach((arrow) => {
-      const edge = state.cy.getElementById(arrow);
-      edge.style({
-        width: 3,
-        "line-color": color,
-        "target-arrow-color": color,
-        "target-arrow-shape": "triangle"
-      });
-    });
-    const currentPieceLocalArrow = currentArrowOffset - consumedArrows;
-    const currentArrow = currentPiece.piece.arrows[currentPieceLocalArrow];
-    const localProgress = step % stepsPerArrow / stepsPerArrow;
-    const center = localProgress * 100;
-    const start = Math.max(0, center - 18);
-    const end = Math.min(100, center + 18);
-    state.cy.getElementById(currentArrow).style({
-      width: 5,
-      "line-fill": "linear-gradient",
-      "line-gradient-stop-colors": `${color} ${color} ${flowColor} ${color} ${color}`,
-      "line-gradient-stop-positions": `0 ${start} ${center} ${end} 100`
-    });
-    step += 1;
-    if (step > totalSteps) {
-      clearRelationAnimation(state);
-      resetCanvasEdgeStyles(state);
-      setAmbiguityPieceClasses(row, -1, new Set);
-    }
-  }, 60);
-}
-function selectRelation(state, index) {
-  state.selectedRelationIndex = index;
-  state.selectedAmbiguityId = null;
-  clearRelationAnimation(state);
-  if (!state.cy) {
-    return;
-  }
-  const rows = document.querySelectorAll("#relOutput .relationRow");
-  resetCanvasEdgeStyles(state);
-  rows.forEach((row) => row.classList.remove("selectedRelationRow"));
-  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
-  document.querySelectorAll("#ambiguityOutput .ambiguity-piece").forEach((piece) => piece.classList.remove("is-pair-highlighted", "is-flow-current"));
-  if (index < 0 || index >= rows.length || index >= state.relations.length) {
-    return;
-  }
-  rows[index].classList.add("selectedRelationRow");
-  const color = relationHighlightColor(index);
-  const pathsToAnimate = [];
-  let allEdges = state.cy.collection();
-  for (const term of state.relations[index].terms ?? []) {
-    const edgesInPath = [];
-    for (const arrow of term.monomial) {
-      const edge = state.cy.getElementById(arrow);
-      edgesInPath.push(edge);
-      allEdges = allEdges.union(edge);
-    }
-    pathsToAnimate.push(edgesInPath);
-  }
-  allEdges.style({
-    width: 2,
-    "line-color": color,
-    "target-arrow-color": color,
-    "target-arrow-shape": "triangle"
-  });
-  allEdges.style({
-    "line-fill": "linear-gradient",
-    "line-gradient-stop-colors": `${color} ${color} #dafd13 ${color} ${color}`,
-    "line-gradient-stop-positions": "0 0 0 0 0"
-  });
-  let position = 0;
-  state.animationTimer = setInterval(() => {
-    position = (position + 4) % 200;
-    const t = position / 200;
-    const edgeUpdates = new Map;
-    for (const path of pathsToAnimate) {
-      const length = path.length;
-      const globalPosition = t * length * 100;
-      for (let edgeIndex = 0;edgeIndex < length; edgeIndex += 1) {
-        const edge = path[edgeIndex];
-        const edgeId = edge.id();
-        const localCenter = globalPosition - edgeIndex * 100;
-        const isVisible = localCenter >= -20 && localCenter <= 120;
-        if (!isVisible) {
-          continue;
-        }
-        const distance = Math.abs(localCenter - 50);
-        const highlightWidth = Math.max(8, 26 - distance * 0.18);
-        const start = Math.max(0, Math.min(100, localCenter - highlightWidth));
-        const middle = Math.max(0, Math.min(100, localCenter));
-        const end = Math.max(0, Math.min(100, localCenter + highlightWidth));
-        const update = edgeUpdates.get(edgeId) ?? { stops: [], colors: [] };
-        update.stops.push(0, start, middle, end, 100);
-        update.colors.push(color, color, "#dafd13", color, color);
-        edgeUpdates.set(edgeId, update);
-      }
-    }
-    for (const [edgeId, update] of edgeUpdates) {
-      state.cy.getElementById(edgeId).style({
-        "line-fill": "linear-gradient",
-        "line-gradient-stop-colors": update.colors.join(" "),
-        "line-gradient-stop-positions": update.stops.join(" ")
-      });
-    }
-  }, 45);
-}
-function editSelectedRelation(state) {
-  if (!state.relations.length) {
-    setError("No relation to edit.");
-    return;
-  }
-  if (state.selectedRelationIndex < 0 || state.selectedRelationIndex >= state.relations.length) {
-    setError("Please select a relation to edit.");
-    return;
-  }
-  const current = formatRelationDataForInput(state.relations[state.selectedRelationIndex]);
-  const relationInput = prompt("Edit relation:", current);
-  if (relationInput === null) {
-    return;
-  }
-  try {
-    const relation = parseSingleRelation(relationInput, quiverFromCytoscape(state.cy), {
-      forceArrowIds: document.getElementById("forceArrow")?.checked ?? false,
-      forceVertexIds: document.getElementById("forceID")?.checked ?? false
-    });
-    state.relations[state.selectedRelationIndex] = relation;
-    const relationToSelect = state.selectedRelationIndex;
-    clearAmbiguityResults(state);
-    refreshRelationsOutput(state);
-    selectRelation(state, relationToSelect);
-  } catch (error) {
-    setError(error.message);
-  }
-}
-function ensureAddRelationEditor() {
-  let editor = document.getElementById("addRelationEditor");
-  if (editor) {
-    return editor;
-  }
-  editor = document.createElement("div");
-  editor.id = "addRelationEditor";
-  editor.className = "relationRow add-relation-editor";
-  editor.contentEditable = "true";
-  editor.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      const button = document.getElementById("btnAddReln");
-      button?.click();
-    }
-  });
-  document.getElementById("relOutput")?.appendChild(editor);
-  return editor;
-}
-function enterAddRelationMode(state) {
-  if (!state.cy) {
-    setError("Draw a quiver before adding relations.");
-    return;
-  }
-  state.addRelationMode = true;
-  const output = document.getElementById("relOutput");
-  output?.classList.add("add-relation-mode");
-  const editor = ensureAddRelationEditor();
-  editor.focus();
-  const addButton = document.getElementById("btnAddReln");
-  if (addButton) {
-    addButton.value = "Save added relations";
-  }
-}
-function exitAddRelationMode(state, commitChanges = true) {
-  const editor = document.getElementById("addRelationEditor");
-  const addedText = editor?.innerText.trim() ?? "";
-  if (commitChanges && addedText !== "") {
-    try {
-      const { relations } = parseRelationEntries(addedText, quiverFromCytoscape(state.cy), {
-        forceArrowIds: document.getElementById("forceArrow")?.checked ?? false,
-        forceVertexIds: document.getElementById("forceID")?.checked ?? false
-      });
-      if (relations.length === 0) {
-        setError("No valid relation entered.");
-      } else {
-        state.relations = state.relations.concat(relations);
-        clearAmbiguityResults(state);
-      }
-    } catch (error) {
-      setError(error.message);
-    }
-  }
-  editor?.remove();
-  state.addRelationMode = false;
-  refreshRelationsOutput(state);
-}
-function toggleAddRelationMode(state) {
-  if (state.addRelationMode) {
-    exitAddRelationMode(state, true);
-  } else {
-    enterAddRelationMode(state);
-  }
-}
-function guardRelationOutputEdit(state, event) {
-  if (state.addRelationMode && event.target instanceof Node && document.getElementById("addRelationEditor")?.contains(event.target)) {
-    return;
-  }
-  event.preventDefault();
-}
-function focusAddRelationEditor(state, event) {
-  if (!state.addRelationMode) {
-    return;
-  }
-  const target = event.target;
-  if (target?.closest(".relationRow")) {
-    return;
-  }
-  const editor = document.getElementById("addRelationEditor");
-  if (editor && !editor.contains(target)) {
-    event.preventDefault();
-    editor.focus();
-  }
-}
-function removeRelationsUsingArrows(state, removedArrows) {
-  if (!removedArrows.length) {
-    return;
-  }
-  state.relations = state.relations.filter((relation) => !(relation.terms ?? []).some((term) => term.monomial.some((arrow) => removedArrows.includes(arrow))));
-  clearAmbiguityResults(state);
-  refreshRelationsOutput(state);
-}
-
-// src/frontend/cytoscape-view.ts
-function applyCytoscapeTheme(state) {
-  if (!state.cy) {
-    return;
-  }
-  state.cy.style(cytoStyle());
-  if (state.selectedRelationIndex >= 0) {
-    selectRelation(state, state.selectedRelationIndex);
-  }
-}
-function promptNameAndCheck(message, cyInstance, type, state) {
-  const autoName = document.getElementById("autoName")?.checked ?? false;
-  if (autoName) {
-    const prefix = type === "vertex" ? "v" : "a";
-    let counter = type === "vertex" ? state.autoNameVertexCounter : state.autoNameArrowCounter;
-    let name2 = `${prefix}${counter}`;
-    while (cyInstance && cyInstance.getElementById(name2).length !== 0) {
-      counter += 1;
-      name2 = `${prefix}${counter}`;
-    }
-    if (type === "vertex") {
-      state.autoNameVertexCounter = counter + 1;
-    } else {
-      state.autoNameArrowCounter = counter + 1;
-    }
-    return name2;
-  }
-  const name = prompt(message);
-  if (!name) {
-    return null;
-  }
-  if (cyInstance && cyInstance.getElementById(name).length !== 0) {
-    setError("Vertex/Arrow with this name already exists.");
-    return null;
-  }
-  return name;
-}
-function clickOnCanvas(event, cyInstance, state) {
-  const target = event.target;
-  if (state.mode === "add") {
-    if (target === cyInstance) {
-      const name = promptNameAndCheck("Enter name for new vertex:", cyInstance, "vertex", state);
-      if (name) {
-        cyInstance.add({
-          group: "nodes",
-          data: { id: name },
-          position: event.position
-        });
-      }
-    } else if (target.isNode()) {
-      if (state.addingArrow) {
-        const name = promptNameAndCheck("Enter name for new arrow:", cyInstance, "arrow", state);
-        if (name) {
-          cyInstance.add({
-            group: "edges",
-            data: {
-              id: name,
-              source: state.sourceNodeId,
-              target: target.id(),
-              label: name
-            }
-          });
-          state.addingArrow = false;
-          state.sourceNodeId = null;
-          setTimeout(() => target.unselect(), 50);
-        }
-      } else {
-        state.addingArrow = true;
-        state.sourceNodeId = target.id();
-      }
-    }
-    return;
-  }
-  if (state.mode === "delete") {
-    if (target !== cyInstance) {
-      let removedArrows = [];
-      if (target.isNode()) {
-        removedArrows = target.connectedEdges().map((edge) => edge.id());
-      } else if (target.isEdge()) {
-        removedArrows = [target.id()];
-      }
-      cyInstance.remove(target);
-      removeRelationsUsingArrows(state, removedArrows);
-    }
-    return;
-  }
-  if (state.mode === "rename" && target !== cyInstance) {
-    const oldId = target.id();
-    const type = target.isNode() ? "vertex" : "arrow";
-    const newName = promptNameAndCheck(`Enter new name for ${type} (current: ${oldId}):`, cyInstance, type, state);
-    target.unselect();
-    if (!newName) {
-      return;
-    }
-    if (target.isNode()) {
-      const edges = target.connectedEdges();
-      const edgesJson = edges.jsons();
-      const nodeJson = target.json();
-      cyInstance.remove(target);
-      nodeJson.data.id = newName;
-      cyInstance.add(nodeJson);
-      edgesJson.forEach((edge) => {
-        if (edge.data.source === oldId) {
-          edge.data.source = newName;
-        }
-        if (edge.data.target === oldId) {
-          edge.data.target = newName;
-        }
-        cyInstance.add(edge);
-      });
-    } else {
-      const edgeJson = target.json();
-      cyInstance.remove(target);
-      edgeJson.data.id = newName;
-      edgeJson.data.label = newName;
-      cyInstance.add(edgeJson);
-      renameArrowInRelations(oldId, newName, state.relations, cyInstance, state);
-    }
-  }
-}
-function initCytoscape(state, inputData, isPreset = false) {
-  const layout = isPreset ? { name: "preset", fit: false } : {
-    name: "breadthfirst",
-    fit: true,
-    padding: 20,
-    nodeDimensionsIncludeLabels: true
-  };
-  const cyInstance = cytoscape({
-    container: document.getElementById("cy"),
-    elements: inputData,
-    style: cytoStyle(),
-    layout,
-    selectionType: "single",
-    userZoomingEnabled: true,
-    userPanningEnabled: true,
-    wheelSensitivity: 0.5,
-    pan: { x: 40, y: 40 }
-  });
-  cyInstance.on("tap", (event) => clickOnCanvas(event, cyInstance, state));
-  state.cy = cyInstance;
-  window.cy = cyInstance;
-  return cyInstance;
-}
-function presentData(state, quiver, relations, isPreset = false) {
-  state.quiverData = quiver;
-  state.relations = relations;
-  state.ambiguityGroupsByOrientation = null;
-  state.selectedAmbiguityId = null;
-  state.relationPanelTab = "relations";
-  refreshRelationsOutput(state);
-  ["saveSVG", "fixCyto", "wriggle", "toQPABtn"].forEach((id) => {
-    const button = document.getElementById(id);
-    if (button) {
-      button.disabled = false;
-    }
-  });
-  state.cy = initCytoscape(state, quiver, isPreset);
-}
-function bendArrow(state, direction) {
-  const edges = state.cy?.$("edge:selected");
-  if (!edges) {
-    return;
-  }
-  for (const edge of edges) {
-    const currentDistance = edge.style("control-point-distance");
-    let distance = 0;
-    if (direction === "L") {
-      distance = -40;
-    } else if (direction === "R") {
-      distance = 40;
-    }
-    if (currentDistance) {
-      const current = Number.parseInt(currentDistance.substring(0, currentDistance.indexOf("px")), 10);
-      if (current >= 0 && distance > 0 || current <= 0 && distance < 0) {
-        edge.style("control-point-distance", current + distance);
-      } else {
-        edge.style("control-point-distance", 0);
-      }
-      edge.style("control-point-weights", 0.5);
-    } else {
-      edge.style("control-point-weights", 0.5);
-      edge.style("control-point-distance", distance);
-    }
-    if (edge.codirectedEdges().length === 1) {
-      edge.style("curve-style", "unbundled-bezier");
-    }
-  }
-}
-function doubleQuiver(state) {
-  if (!state.cy) {
-    setError("Draw a quiver before doubling arrows.");
-    return;
-  }
-  const existingArrowIds = new Set(state.cy.edges().map((edge) => edge.id()));
-  const arrowsToDouble = state.cy.edges().filter((edge) => !edge.id().endsWith("*"));
-  const reverseArrows = [];
-  const skipped = [];
-  for (const edge of arrowsToDouble) {
-    const reverseId = `${edge.id()}*`;
-    if (existingArrowIds.has(reverseId)) {
-      skipped.push(reverseId);
-      continue;
-    }
-    reverseArrows.push({
-      group: "edges",
-      data: {
-        id: reverseId,
-        source: edge.data("target"),
-        target: edge.data("source"),
-        label: reverseId
-      }
-    });
-  }
-  if (reverseArrows.length > 0) {
-    state.ambiguityGroupsByOrientation = null;
-    state.selectedAmbiguityId = null;
-    state.relationPanelTab = "relations";
-    refreshRelationsOutput(state);
-    state.cy.add(reverseArrows);
-    state.cy.forceRender();
-  }
-  setOutputHtml([
-    `Added ${reverseArrows.length} reverse arrow(s).`,
-    skipped.length > 0 ? `Skipped existing reverse arrow(s): ${skipped.join(", ")}` : ""
-  ].filter(Boolean).join("<br>"));
-}
-function clearAll(state) {
-  state.addRelationMode = false;
-  state.quiverData = null;
-  state.relations = [];
-  state.ambiguityGroupsByOrientation = null;
-  state.selectedAmbiguityId = null;
-  state.relationPanelTab = "relations";
-  state.cy = null;
-  const quiverInput = document.getElementById("inQuiver");
-  const relationInput = document.getElementById("inRelation");
-  if (quiverInput) {
-    quiverInput.value = "";
-  }
-  if (relationInput) {
-    relationInput.value = "";
-  }
-  ["toQPABtn", "fixCyto", "wriggle", "saveSVG"].forEach((id) => {
-    const button = document.getElementById(id);
-    if (button) {
-      button.disabled = true;
-    }
-  });
-  refreshRelationsOutput(state);
-}
-function createInitialVertexAtClick(state, event) {
-  if (state.cy || state.mode !== "add") {
-    return;
-  }
-  const name = promptNameAndCheck("Enter name for new vertex:", null, "vertex", state);
-  if (!name) {
-    return;
-  }
-  const element = {
-    group: "nodes",
-    data: { id: name },
-    position: { x: event.offsetX - 40, y: event.offsetY - 40 }
-  };
-  state.quiverData = { nodes: [element], edges: [] };
-  state.cy = initCytoscape(state, state.quiverData, true);
-  ["toQPABtn", "fixCyto", "wriggle", "saveSVG"].forEach((id) => {
-    const button = document.getElementById(id);
-    if (button) {
-      button.disabled = false;
-    }
-  });
-}
-
-// src/frontend/file-actions.ts
-function saveFile(state, type) {
-  if (!state.cy) {
-    return;
-  }
-  let content;
-  let blob;
-  if (type === "svg") {
-    content = state.cy.svg({ scale: 1, full: true, bg: "#ffffff" });
-    blob = new Blob([content], { type: "image/svg+xml;charset=utf-8" });
-  } else {
-    content = JSON.stringify({ cy: state.cy.json(), reln: state.relations });
-    blob = new Blob([content], { type: "application/json;charset=utf-8" });
-  }
-  const filename = document.getElementById("filenameInput")?.value ?? "quiver";
-  saveAs(blob, `${filename}.${type}`);
-}
-function loadJsonFile(state, file) {
-  const reader = new FileReader;
-  reader.addEventListener("load", () => {
-    const result = JSON.parse(`${reader.result}`);
-    presentData(state, result.cy.elements, result.reln, true);
-  });
-  reader.readAsText(file);
-}
-function translateToQpa(state) {
-  if (!state.cy) {
-    return;
-  }
-  const qpaCode = exportQpa(state.cy.json().elements, state.relations);
-  setOutputHtml(qpaCode);
-}
-
-// src/frontend/theme.ts
-function initialTheme() {
-  const savedTheme = localStorage.getItem("gapToCytoTheme");
-  if (savedTheme === "light" || savedTheme === "dark") {
-    return savedTheme;
-  }
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-function applyTheme(state, theme) {
-  document.body.dataset.theme = theme;
-  const themeToggle = document.getElementById("themeToggle");
-  if (!themeToggle) {
-    return;
-  }
-  const isDark = theme === "dark";
-  themeToggle.textContent = isDark ? "Light theme" : "Dark theme";
-  themeToggle.setAttribute("aria-pressed", isDark ? "true" : "false");
-  applyCytoscapeTheme(state);
-}
-function toggleTheme(state) {
-  const currentTheme = document.body.dataset.theme ?? initialTheme();
-  const nextTheme = currentTheme === "dark" ? "light" : "dark";
-  localStorage.setItem("gapToCytoTheme", nextTheme);
-  applyTheme(state, nextTheme);
-}
-
 // src/backend/paths.ts
 function vertexPath(vertexId, orientation) {
   return {
@@ -1354,6 +451,9 @@ function vertexPath(vertexId, orientation) {
     target: vertexId,
     orientation
   };
+}
+function printPath(path) {
+  return `(${path.orientation})${path.arrows.join("*")}:${path.source}~>${path.target}`;
 }
 
 // src/backend/quiver.ts
@@ -1837,6 +937,99 @@ function tidyUpMonomialAlgebra(input) {
     logs
   };
 }
+function arrowPathL2R(quiver, arrowId) {
+  const arrow = arrowById(quiver, arrowId);
+  if (!arrow) {
+    throw new Error(`Unknown arrow '${arrowId}'.`);
+  }
+  return {
+    arrows: [arrow.id],
+    source: arrow.source,
+    target: arrow.target,
+    orientation: "L2R"
+  };
+}
+function extendPathL2R(path, arrowId, quiver) {
+  const arrow = arrowById(quiver, arrowId);
+  if (!arrow) {
+    throw new Error(`Unknown arrow '${arrowId}'.`);
+  }
+  if (path.target !== arrow.source) {
+    throw new Error(`Cannot extend path ending at '${path.target}' by arrow '${arrow.id}'.`);
+  }
+  return {
+    arrows: [...path.arrows, arrow.id],
+    source: path.source,
+    target: arrow.target,
+    orientation: "L2R"
+  };
+}
+function containsRelationGenerator(path, relationGenerators) {
+  return relationGenerators.some((relation) => containsContiguousWord(path.arrows, relation.path.arrows));
+}
+function enumerateAdmissiblePathsFromVerified(relationGenerators) {
+  const logs = [...relationGenerators.logs];
+  const paths = [];
+  const seen = new Set;
+  let frontier = [];
+  const addPath = (path) => {
+    const key = printPath(path);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    paths.push(path);
+    return true;
+  };
+  for (const vertex of relationGenerators.quiver.vertices) {
+    addPath(vertexPath(vertex.id, "L2R"));
+  }
+  for (const arrow of relationGenerators.quiver.arrows) {
+    const path = arrowPathL2R(relationGenerators.quiver, arrow.id);
+    if (!containsRelationGenerator(path, relationGenerators.minimisedRelations) && addPath(path)) {
+      frontier.push(path);
+    }
+  }
+  let reachedMaxPathLength = false;
+  while (frontier.length > 0) {
+    const nextFrontier = [];
+    for (const path of frontier) {
+      const composableArrows = relationGenerators.quiver.arrows.filter((arrow) => arrow.source === path.target);
+      if (path.arrows.length >= relationGenerators.maxPathLength) {
+        if (composableArrows.some((arrow) => {
+          const extended = extendPathL2R(path, arrow.id, relationGenerators.quiver);
+          return !containsRelationGenerator(extended, relationGenerators.minimisedRelations);
+        })) {
+          reachedMaxPathLength = true;
+        }
+        continue;
+      }
+      for (const arrow of composableArrows) {
+        const extended = extendPathL2R(path, arrow.id, relationGenerators.quiver);
+        if (containsRelationGenerator(extended, relationGenerators.minimisedRelations)) {
+          continue;
+        }
+        if (addPath(extended)) {
+          nextFrontier.push(extended);
+        }
+      }
+    }
+    frontier = nextFrontier;
+  }
+  if (reachedMaxPathLength) {
+    logs.push({
+      level: "warning",
+      message: `Reached maxPathLength ${relationGenerators.maxPathLength}; finite-dimensionality was not confirmed.`
+    });
+  }
+  return {
+    paths,
+    relationGenerators,
+    logs,
+    reachedMaxPathLength,
+    finiteDimensionalityConfirmed: !reachedMaxPathLength
+  };
+}
 
 // src/backend/ambiguities.ts
 var AMBIGUITY_LOG_PREFIX = "[GAPCytoEx ambiguity]";
@@ -2272,6 +1465,1380 @@ function computeAmbiguitiesFromVerified(verified, comparisonMaxDegree = verified
   };
 }
 
+// src/frontend/cytoscape-style.ts
+function activeTheme() {
+  return document.body.dataset.theme === "dark" ? "dark" : "light";
+}
+function cytoThemeColors(theme = activeTheme()) {
+  return theme === "dark" ? {
+    nodeFill: "#111827",
+    nodeBorder: "#cbd5e1",
+    nodeText: "#e5edf7",
+    selectedNode: "#f87171",
+    edge: "#d1d5db",
+    selectedEdge: "#93c5fd",
+    edgeLabel: "#fca5a5",
+    edgeLabelOutline: "#1f2937"
+  } : {
+    nodeFill: "#ffffff",
+    nodeBorder: "#000000",
+    nodeText: "#000000",
+    selectedNode: "#fa5252",
+    edge: "#000000",
+    selectedEdge: "#7379f4",
+    edgeLabel: "#ff1818",
+    edgeLabelOutline: "#eeee00"
+  };
+}
+function relationHighlightColor(index) {
+  return activeTheme() === "dark" ? index % 2 === 0 ? "#fbbf24" : "#86efac" : index % 2 === 0 ? "#ff6f00" : "#0080ff";
+}
+function coloredEdgeStyle(color) {
+  return {
+    width: 2,
+    "line-color": color,
+    "target-arrow-color": color,
+    "target-arrow-shape": "triangle",
+    "curve-style": "bezier",
+    "loop-direction": "0deg",
+    "loop-sweep": "45deg"
+  };
+}
+function cytoStyle(theme = activeTheme()) {
+  const colors = cytoThemeColors(theme);
+  return [
+    {
+      selector: "node",
+      style: {
+        width: 25,
+        height: 25,
+        shape: "ellipse",
+        "background-color": colors.nodeFill,
+        "border-width": "1px",
+        "border-style": "solid",
+        "border-color": colors.nodeBorder,
+        color: colors.nodeText,
+        content: "data(id)",
+        "text-valign": "center",
+        "text-halign": "center"
+      }
+    },
+    {
+      selector: "node:selected",
+      style: {
+        "background-color": colors.selectedNode,
+        width: 30,
+        height: 30
+      }
+    },
+    { selector: "edge", style: coloredEdgeStyle(colors.edge) },
+    { selector: "edge:selected", style: coloredEdgeStyle(colors.selectedEdge) },
+    {
+      selector: "edge[label]",
+      style: {
+        label: "data(label)",
+        color: colors.edgeLabel,
+        "font-size": "22pt",
+        "font-weight": "bold",
+        "text-outline-color": colors.edgeLabelOutline,
+        "text-outline-width": 2
+      }
+    }
+  ];
+}
+
+// src/frontend/relation-ui.ts
+function formatPathWord(arrows) {
+  return arrows.join("·");
+}
+function formatPathForDisplay(path) {
+  if (path.arrows.length === 0) {
+    return `(${path.target})`;
+  }
+  return formatPathWord(path.arrows);
+}
+function formatPathForL2RDisplay(path) {
+  if (path.arrows.length === 0) {
+    return `(${path.target})`;
+  }
+  const arrows = path.orientation === "R2L" ? [...path.arrows].reverse() : path.arrows;
+  return formatPathWord(arrows);
+}
+function formatAmbiguityPiece(piece) {
+  return formatPathForDisplay(piece);
+}
+function ambiguityRowId(degree, index) {
+  return `ambiguity-${degree}-${index}`;
+}
+function hochschildBasisRowId(degree, index) {
+  return `hochschild-${degree}-${index}`;
+}
+function ambiguityByIndex(state, degree, index) {
+  const groups = state.ambiguityGroupsByOrientation?.[state.activePathOrientation];
+  const group = groups?.find((candidate) => candidate.degree === degree);
+  return group?.ambiguities[index] ?? null;
+}
+function hochschildBasisByIndex(state, degree, index) {
+  const term = state.hochschildComplex?.terms.find((candidate) => candidate.degree === degree);
+  return term?.basis[index] ?? null;
+}
+function resetCanvasEdgeStyles(state) {
+  if (!state.cy) {
+    return;
+  }
+  const colors = cytoThemeColors();
+  for (const edge of state.cy.edges()) {
+    edge.style({
+      width: 2,
+      "line-color": colors.edge,
+      "target-arrow-color": colors.edge,
+      "target-arrow-shape": "triangle"
+    });
+    edge.removeStyle("line-fill line-gradient-stop-colors line-gradient-stop-positions");
+  }
+}
+function setAmbiguityPieceClasses(row, currentPieceIndex, highlightedPieceIndexes) {
+  row?.querySelectorAll(".ambiguity-piece").forEach((piece) => {
+    const pieceIndex = Number(piece.dataset.pieceIndex ?? "-1");
+    piece.classList.toggle("is-pair-highlighted", highlightedPieceIndexes.has(pieceIndex));
+    piece.classList.toggle("is-flow-current", pieceIndex === currentPieceIndex);
+  });
+}
+function renderAmbiguityRowContents(row, ambiguity) {
+  row.textContent = "";
+  ambiguity.pieces.forEach((piece, pieceIndex) => {
+    if (pieceIndex > 0) {
+      row.appendChild(document.createTextNode(" | "));
+    }
+    const pieceElement = document.createElement("span");
+    pieceElement.className = "ambiguity-piece";
+    pieceElement.dataset.pieceIndex = String(pieceIndex);
+    pieceElement.textContent = formatAmbiguityPiece(piece);
+    row.appendChild(pieceElement);
+  });
+}
+function setRelationPanelTab(state, tab) {
+  if (tab === "ambiguities" && !state.ambiguityGroupsByOrientation) {
+    tab = "relations";
+  }
+  if (tab === "hochschild-complex" && !state.hochschildComplex) {
+    tab = "relations";
+  }
+  state.relationPanelTab = tab;
+  document.querySelectorAll("[data-relation-panel-tab]").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.relationPanelTab === tab ? "true" : "false");
+  });
+  const relationPanel = document.getElementById("relationsTabPanel");
+  const ambiguityPanel = document.getElementById("ambiguitiesTabPanel");
+  const hochschildPanel = document.getElementById("hochschildComplexTabPanel");
+  if (relationPanel) {
+    relationPanel.hidden = tab !== "relations";
+  }
+  if (ambiguityPanel) {
+    ambiguityPanel.hidden = tab !== "ambiguities";
+  }
+  if (hochschildPanel) {
+    hochschildPanel.hidden = tab !== "hochschild-complex";
+  }
+}
+function refreshRelationPanelTabs(state) {
+  const ambiguityButton = document.getElementById("ambiguitiesTabButton");
+  const hochschildButton = document.getElementById("hochschildComplexTabButton");
+  const hasAmbiguities = state.ambiguityGroupsByOrientation !== null;
+  const hasHochschildComplex = state.hochschildComplex !== null;
+  if (ambiguityButton) {
+    ambiguityButton.hidden = !hasAmbiguities;
+  }
+  if (hochschildButton) {
+    hochschildButton.hidden = !hasHochschildComplex;
+  }
+  const hasActiveTab = state.relationPanelTab === "relations" || state.relationPanelTab === "ambiguities" && hasAmbiguities || state.relationPanelTab === "hochschild-complex" && hasHochschildComplex;
+  setRelationPanelTab(state, hasActiveTab ? state.relationPanelTab : "relations");
+}
+function refreshAmbiguitiesOutput(state) {
+  refreshRelationPanelTabs(state);
+  const output = document.getElementById("ambiguityOutput");
+  if (!output) {
+    return;
+  }
+  output.innerHTML = "";
+  state.selectedAmbiguityId = null;
+  const groups = state.ambiguityGroupsByOrientation?.[state.activePathOrientation];
+  if (!groups) {
+    return;
+  }
+  let rowIndex = 0;
+  for (const [groupIndex, group] of groups.entries()) {
+    if (groupIndex > 0) {
+      output.appendChild(document.createElement("hr")).className = "ambiguity-divider";
+    }
+    const heading = document.createElement("div");
+    heading.className = "ambiguity-degree";
+    heading.textContent = `Gamma[${group.degree}] (${group.ambiguities.length})`;
+    output.appendChild(heading);
+    if (group.ambiguities.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "ambiguityRow row-even";
+      empty.textContent = "(empty)";
+      output.appendChild(empty);
+      rowIndex += 1;
+      continue;
+    }
+    group.ambiguities.forEach((ambiguity, ambiguityIndex) => {
+      const row = document.createElement("div");
+      row.className = `ambiguityRow ${rowIndex % 2 === 0 ? "row-even" : "row-odd"}`;
+      row.dataset.ambiguityId = ambiguityRowId(group.degree, ambiguityIndex);
+      renderAmbiguityRowContents(row, ambiguity);
+      row.addEventListener("click", () => selectAmbiguity(state, group.degree, ambiguityIndex));
+      output.appendChild(row);
+      rowIndex += 1;
+    });
+  }
+}
+function clearAmbiguityResults(state) {
+  state.monomialComputationContext = null;
+  state.ambiguityGroupsByOrientation = null;
+  state.hochschildComplex = null;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
+  state.relationPanelTab = "relations";
+  refreshAmbiguitiesOutput(state);
+  refreshHochschildComplexOutput(state);
+}
+function formatCochainBasisElement(element) {
+  return `${formatPathForL2RDisplay(underlyingPathOfAmbiguity(element.ambiguity))}||${formatPathForL2RDisplay(element.basisPath)}`;
+}
+function formatCoefficient(value, isFirst) {
+  if (value === 1) {
+    return isFirst ? "" : "+ ";
+  }
+  if (value === -1) {
+    return "- ";
+  }
+  if (value < 0) {
+    return `${value} `;
+  }
+  return isFirst ? `${value} ` : `+ ${value} `;
+}
+function formatImageForColumn(matrix, target, col) {
+  const entries = matrix.entries.filter((entry) => entry.col === col);
+  if (entries.length === 0) {
+    return "0";
+  }
+  return entries.map((entry, index) => `${formatCoefficient(entry.value, index === 0)}${formatCochainBasisElement(target.basis[entry.row])}`).join(" ");
+}
+function appendHochschildTerm(output, state, term, rowIndex) {
+  const heading = document.createElement("div");
+  heading.className = "ambiguity-degree";
+  heading.textContent = `C^${term.degree} (${term.dimension})`;
+  output.appendChild(heading);
+  if (term.basis.length === 0) {
+    return;
+  }
+  term.basis.forEach((basisElement, basisIndex) => {
+    const row = document.createElement("div");
+    row.className = `hochschildRow ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
+    row.dataset.hochschildBasisId = hochschildBasisRowId(term.degree, basisIndex);
+    row.textContent = formatCochainBasisElement(basisElement);
+    row.addEventListener("click", () => selectHochschildBasis(state, term.degree, basisIndex));
+    output.appendChild(row);
+    rowIndex.value += 1;
+  });
+}
+function appendHochschildDifferential(output, source, target, matrix, rowIndex) {
+  const heading = document.createElement("div");
+  heading.className = "ambiguity-degree hochschild-differential-heading";
+  const hasNonzeroImage = matrix.entries.length > 0;
+  heading.textContent = hasNonzeroImage ? `d^${source.degree}` : `d^${source.degree} = 0`;
+  output.appendChild(heading);
+  if (source.basis.length === 0 || !hasNonzeroImage) {
+    return;
+  }
+  source.basis.forEach((basisElement, col) => {
+    if (!matrix.entries.some((entry) => entry.col === col)) {
+      return;
+    }
+    const row = document.createElement("div");
+    row.className = `hochschildRow differential-row ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
+    row.textContent = `${formatCochainBasisElement(basisElement)} ↦ ${formatImageForColumn(matrix, target, col)}`;
+    output.appendChild(row);
+    rowIndex.value += 1;
+  });
+}
+function refreshHochschildComplexOutput(state) {
+  refreshRelationPanelTabs(state);
+  const output = document.getElementById("hochschildComplexOutput");
+  if (!output) {
+    return;
+  }
+  output.innerHTML = "";
+  state.selectedHochschildBasisId = null;
+  const complex = state.hochschildComplex;
+  if (!complex) {
+    return;
+  }
+  const rowIndex = { value: 0 };
+  for (let index = 0;index < complex.terms.length; index += 1) {
+    if (index > 0) {
+      output.appendChild(document.createElement("hr")).className = "ambiguity-divider";
+    }
+    appendHochschildTerm(output, state, complex.terms[index], rowIndex);
+    const nextTerm = complex.terms[index + 1];
+    const differential = complex.coboundaries[index];
+    if (nextTerm && differential) {
+      appendHochschildDifferential(output, complex.terms[index], nextTerm, differential, rowIndex);
+    }
+  }
+}
+function selectAmbiguity(state, degree, index) {
+  const ambiguity = ambiguityByIndex(state, degree, index);
+  if (!ambiguity) {
+    return;
+  }
+  state.selectedRelationIndex = -1;
+  state.selectedAmbiguityId = ambiguityRowId(degree, index);
+  state.selectedHochschildBasisId = null;
+  clearRelationAnimation(state);
+  resetCanvasEdgeStyles(state);
+  document.querySelectorAll("#relOutput .relationRow").forEach((row2) => row2.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row2) => row2.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#hochschildComplexOutput .hochschildRow").forEach((row2) => row2.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguity-piece").forEach((piece) => piece.classList.remove("is-pair-highlighted", "is-flow-current"));
+  const row = document.querySelector(`#ambiguityOutput [data-ambiguity-id="${state.selectedAmbiguityId}"]`);
+  row?.classList.add("selectedRelationRow");
+  animateAmbiguity(state, ambiguity, row);
+}
+function selectHochschildBasis(state, degree, index) {
+  const basisElement = hochschildBasisByIndex(state, degree, index);
+  if (!basisElement) {
+    return;
+  }
+  state.selectedRelationIndex = -1;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = hochschildBasisRowId(degree, index);
+  clearRelationAnimation(state);
+  resetCanvasEdgeStyles(state);
+  document.querySelectorAll("#relOutput .relationRow").forEach((row2) => row2.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row2) => row2.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#hochschildComplexOutput .hochschildRow").forEach((row2) => row2.classList.remove("selectedRelationRow"));
+  const row = document.querySelector(`#hochschildComplexOutput [data-hochschild-basis-id="${state.selectedHochschildBasisId}"]`);
+  row?.classList.add("selectedRelationRow");
+  const pColor = relationHighlightColor(0);
+  const bColor = relationHighlightColor(1);
+  const pPath = underlyingPathOfAmbiguity(basisElement.ambiguity);
+  pPath.arrows.forEach((arrow) => {
+    state.cy?.getElementById(arrow).style({
+      width: 4,
+      "line-color": pColor,
+      "target-arrow-color": pColor,
+      "target-arrow-shape": "triangle"
+    });
+  });
+  basisElement.basisPath.arrows.forEach((arrow) => {
+    state.cy?.getElementById(arrow).style({
+      width: 5,
+      "line-color": bColor,
+      "target-arrow-color": bColor,
+      "target-arrow-shape": "triangle"
+    });
+  });
+  appendInfoLog(`Selecting basis ${formatCochainBasisElement(basisElement)} of the ${degree}-th term of Hochschild complex. (p displayed in orange/amber color, b displayed in blue/green color)`);
+}
+function validateRelationArrowReferences(relations, cyInstance) {
+  if (!cyInstance) {
+    return true;
+  }
+  const arrows = new Set(cyInstance.edges().map((edge) => edge.id()));
+  const missing = [...relationArrowNames(relations)].filter((name) => !arrows.has(name));
+  if (missing.length > 0) {
+    setError(`Relations refer to unknown arrow(s): ${[...new Set(missing)].join(", ")}`);
+    return false;
+  }
+  return true;
+}
+function renameArrowInRelations(oldName, newName, relations, cyInstance, state) {
+  if (!relations.length) {
+    return false;
+  }
+  let renamed = false;
+  for (const relation of relations) {
+    if (!relation.terms) {
+      continue;
+    }
+    let relationChanged = false;
+    for (const term of relation.terms) {
+      for (let index = 0;index < term.monomial.length; index += 1) {
+        if (term.monomial[index] === oldName) {
+          term.monomial[index] = newName;
+          relationChanged = true;
+          renamed = true;
+        }
+      }
+    }
+    if (relationChanged) {
+      relation.reln = formatRelationData(relation);
+    }
+  }
+  if (renamed) {
+    clearAmbiguityResults(state);
+    validateRelationArrowReferences(relations, cyInstance);
+    refreshRelationsOutput(state);
+  }
+  return renamed;
+}
+function refreshRelationsOutput(state) {
+  state.addRelationMode = false;
+  refreshRelationPanelTabs(state);
+  const output = document.getElementById("relOutput");
+  if (!output) {
+    return;
+  }
+  output.innerHTML = "";
+  output.classList.remove("add-relation-mode");
+  output.contentEditable = "false";
+  state.selectedRelationIndex = -1;
+  state.selectedHochschildBasisId = null;
+  state.relations.forEach((relation, index) => {
+    const row = document.createElement("div");
+    row.classList.add("relationRow");
+    row.contentEditable = "false";
+    row.setAttribute("id", relation.reln ?? formatRelationData(relation));
+    row.innerHTML = formatRelationData(relation, state.activePathOrientation);
+    row.addEventListener("click", () => selectRelation(state, index));
+    output.appendChild(row);
+  });
+  const addButton = document.getElementById("btnAddReln");
+  if (addButton) {
+    addButton.value = "Add relation(s)";
+  }
+}
+function applyPathOrientationLabel(state) {
+  document.querySelectorAll("[data-orientation]").forEach((button) => {
+    button.setAttribute("aria-pressed", button.dataset.orientation === state.activePathOrientation ? "true" : "false");
+  });
+}
+function setPathOrientation(state, orientation) {
+  if (orientation !== "L2R" && orientation !== "R2L") {
+    return;
+  }
+  if (orientation === state.activePathOrientation) {
+    applyPathOrientationLabel(state);
+    return;
+  }
+  const relationToSelect = state.selectedRelationIndex;
+  state.activePathOrientation = orientation;
+  applyPathOrientationLabel(state);
+  refreshRelationsOutput(state);
+  refreshAmbiguitiesOutput(state);
+  refreshHochschildComplexOutput(state);
+  if (state.cy && relationToSelect >= 0 && relationToSelect < state.relations.length) {
+    selectRelation(state, relationToSelect);
+  }
+}
+function clearRelationAnimation(state) {
+  if (!state.animationTimer) {
+    return;
+  }
+  clearInterval(state.animationTimer);
+  state.animationTimer = null;
+}
+function animateAmbiguity(state, ambiguity, row) {
+  if (!state.cy) {
+    return;
+  }
+  const nonVertexPieces = ambiguity.pieces.map((piece, pieceIndex) => ({ piece, pieceIndex })).filter(({ piece }) => piece.arrows.length > 0);
+  if (nonVertexPieces.length < 2) {
+    const onlyPiece = nonVertexPieces[0];
+    setAmbiguityPieceClasses(row, onlyPiece?.pieceIndex ?? -1, new Set(onlyPiece ? [onlyPiece.pieceIndex] : []));
+    return;
+  }
+  const color = relationHighlightColor(Math.max(0, ambiguity.n));
+  const flowColor = "#dafd13";
+  const stepsPerArrow = 36;
+  let step = 0;
+  const totalArrows = nonVertexPieces.reduce((sum, { piece }) => sum + piece.arrows.length, 0);
+  const totalSteps = Math.max(1, totalArrows * stepsPerArrow);
+  state.animationTimer = setInterval(() => {
+    resetCanvasEdgeStyles(state);
+    const currentArrowOffset = Math.min(totalArrows - 1, Math.floor(step / stepsPerArrow));
+    let consumedArrows = 0;
+    let currentPiecePosition = 0;
+    for (let index = 0;index < nonVertexPieces.length; index += 1) {
+      const pieceLength = nonVertexPieces[index].piece.arrows.length;
+      if (currentArrowOffset < consumedArrows + pieceLength) {
+        currentPiecePosition = index;
+        break;
+      }
+      consumedArrows += pieceLength;
+    }
+    const currentPiece = nonVertexPieces[currentPiecePosition];
+    const nextPiece = nonVertexPieces[currentPiecePosition + 1];
+    const highlightedPieceIndexes = new Set([currentPiece.pieceIndex]);
+    if (nextPiece) {
+      highlightedPieceIndexes.add(nextPiece.pieceIndex);
+    }
+    setAmbiguityPieceClasses(row, currentPiece.pieceIndex, highlightedPieceIndexes);
+    const highlightedArrows = new Set;
+    for (const { pieceIndex, piece } of nonVertexPieces) {
+      if (highlightedPieceIndexes.has(pieceIndex)) {
+        piece.arrows.forEach((arrow) => highlightedArrows.add(arrow));
+      }
+    }
+    highlightedArrows.forEach((arrow) => {
+      const edge = state.cy.getElementById(arrow);
+      edge.style({
+        width: 3,
+        "line-color": color,
+        "target-arrow-color": color,
+        "target-arrow-shape": "triangle"
+      });
+    });
+    const currentPieceLocalArrow = currentArrowOffset - consumedArrows;
+    const currentArrow = currentPiece.piece.arrows[currentPieceLocalArrow];
+    const localProgress = step % stepsPerArrow / stepsPerArrow;
+    const center = localProgress * 100;
+    const start = Math.max(0, center - 18);
+    const end = Math.min(100, center + 18);
+    state.cy.getElementById(currentArrow).style({
+      width: 5,
+      "line-fill": "linear-gradient",
+      "line-gradient-stop-colors": `${color} ${color} ${flowColor} ${color} ${color}`,
+      "line-gradient-stop-positions": `0 ${start} ${center} ${end} 100`
+    });
+    step += 1;
+    if (step > totalSteps) {
+      clearRelationAnimation(state);
+      resetCanvasEdgeStyles(state);
+      setAmbiguityPieceClasses(row, -1, new Set);
+    }
+  }, 60);
+}
+function selectRelation(state, index) {
+  state.selectedRelationIndex = index;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
+  clearRelationAnimation(state);
+  if (!state.cy) {
+    return;
+  }
+  const rows = document.querySelectorAll("#relOutput .relationRow");
+  resetCanvasEdgeStyles(state);
+  rows.forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#hochschildComplexOutput .hochschildRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguity-piece").forEach((piece) => piece.classList.remove("is-pair-highlighted", "is-flow-current"));
+  if (index < 0 || index >= rows.length || index >= state.relations.length) {
+    return;
+  }
+  rows[index].classList.add("selectedRelationRow");
+  const color = relationHighlightColor(index);
+  const pathsToAnimate = [];
+  let allEdges = state.cy.collection();
+  for (const term of state.relations[index].terms ?? []) {
+    const edgesInPath = [];
+    for (const arrow of term.monomial) {
+      const edge = state.cy.getElementById(arrow);
+      edgesInPath.push(edge);
+      allEdges = allEdges.union(edge);
+    }
+    pathsToAnimate.push(edgesInPath);
+  }
+  allEdges.style({
+    width: 2,
+    "line-color": color,
+    "target-arrow-color": color,
+    "target-arrow-shape": "triangle"
+  });
+  allEdges.style({
+    "line-fill": "linear-gradient",
+    "line-gradient-stop-colors": `${color} ${color} #dafd13 ${color} ${color}`,
+    "line-gradient-stop-positions": "0 0 0 0 0"
+  });
+  let position = 0;
+  state.animationTimer = setInterval(() => {
+    position = (position + 4) % 200;
+    const t = position / 200;
+    const edgeUpdates = new Map;
+    for (const path of pathsToAnimate) {
+      const length = path.length;
+      const globalPosition = t * length * 100;
+      for (let edgeIndex = 0;edgeIndex < length; edgeIndex += 1) {
+        const edge = path[edgeIndex];
+        const edgeId = edge.id();
+        const localCenter = globalPosition - edgeIndex * 100;
+        const isVisible = localCenter >= -20 && localCenter <= 120;
+        if (!isVisible) {
+          continue;
+        }
+        const distance = Math.abs(localCenter - 50);
+        const highlightWidth = Math.max(8, 26 - distance * 0.18);
+        const start = Math.max(0, Math.min(100, localCenter - highlightWidth));
+        const middle = Math.max(0, Math.min(100, localCenter));
+        const end = Math.max(0, Math.min(100, localCenter + highlightWidth));
+        const update = edgeUpdates.get(edgeId) ?? { stops: [], colors: [] };
+        update.stops.push(0, start, middle, end, 100);
+        update.colors.push(color, color, "#dafd13", color, color);
+        edgeUpdates.set(edgeId, update);
+      }
+    }
+    for (const [edgeId, update] of edgeUpdates) {
+      state.cy.getElementById(edgeId).style({
+        "line-fill": "linear-gradient",
+        "line-gradient-stop-colors": update.colors.join(" "),
+        "line-gradient-stop-positions": update.stops.join(" ")
+      });
+    }
+  }, 45);
+}
+function editSelectedRelation(state) {
+  if (!state.relations.length) {
+    setError("No relation to edit.");
+    return;
+  }
+  if (state.selectedRelationIndex < 0 || state.selectedRelationIndex >= state.relations.length) {
+    setError("Please select a relation to edit.");
+    return;
+  }
+  const current = formatRelationDataForInput(state.relations[state.selectedRelationIndex]);
+  const relationInput = prompt("Edit relation:", current);
+  if (relationInput === null) {
+    return;
+  }
+  try {
+    const relation = parseSingleRelation(relationInput, quiverFromCytoscape(state.cy), {
+      forceArrowIds: document.getElementById("forceArrow")?.checked ?? false,
+      forceVertexIds: document.getElementById("forceID")?.checked ?? false
+    });
+    state.relations[state.selectedRelationIndex] = relation;
+    const relationToSelect = state.selectedRelationIndex;
+    clearAmbiguityResults(state);
+    refreshRelationsOutput(state);
+    selectRelation(state, relationToSelect);
+  } catch (error) {
+    setError(error.message);
+  }
+}
+function ensureAddRelationEditor() {
+  let editor = document.getElementById("addRelationEditor");
+  if (editor) {
+    return editor;
+  }
+  editor = document.createElement("div");
+  editor.id = "addRelationEditor";
+  editor.className = "relationRow add-relation-editor";
+  editor.contentEditable = "true";
+  editor.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      const button = document.getElementById("btnAddReln");
+      button?.click();
+    }
+  });
+  document.getElementById("relOutput")?.appendChild(editor);
+  return editor;
+}
+function enterAddRelationMode(state) {
+  if (!state.cy) {
+    setError("Draw a quiver before adding relations.");
+    return;
+  }
+  state.addRelationMode = true;
+  const output = document.getElementById("relOutput");
+  output?.classList.add("add-relation-mode");
+  const editor = ensureAddRelationEditor();
+  editor.focus();
+  const addButton = document.getElementById("btnAddReln");
+  if (addButton) {
+    addButton.value = "Save added relations";
+  }
+}
+function exitAddRelationMode(state, commitChanges = true) {
+  const editor = document.getElementById("addRelationEditor");
+  const addedText = editor?.innerText.trim() ?? "";
+  if (commitChanges && addedText !== "") {
+    try {
+      const { relations } = parseRelationEntries(addedText, quiverFromCytoscape(state.cy), {
+        forceArrowIds: document.getElementById("forceArrow")?.checked ?? false,
+        forceVertexIds: document.getElementById("forceID")?.checked ?? false
+      });
+      if (relations.length === 0) {
+        setError("No valid relation entered.");
+      } else {
+        state.relations = state.relations.concat(relations);
+        clearAmbiguityResults(state);
+      }
+    } catch (error) {
+      setError(error.message);
+    }
+  }
+  editor?.remove();
+  state.addRelationMode = false;
+  refreshRelationsOutput(state);
+}
+function toggleAddRelationMode(state) {
+  if (state.addRelationMode) {
+    exitAddRelationMode(state, true);
+  } else {
+    enterAddRelationMode(state);
+  }
+}
+function guardRelationOutputEdit(state, event) {
+  if (state.addRelationMode && event.target instanceof Node && document.getElementById("addRelationEditor")?.contains(event.target)) {
+    return;
+  }
+  event.preventDefault();
+}
+function focusAddRelationEditor(state, event) {
+  if (!state.addRelationMode) {
+    return;
+  }
+  const target = event.target;
+  if (target?.closest(".relationRow")) {
+    return;
+  }
+  const editor = document.getElementById("addRelationEditor");
+  if (editor && !editor.contains(target)) {
+    event.preventDefault();
+    editor.focus();
+  }
+}
+function removeRelationsUsingArrows(state, removedArrows) {
+  if (!removedArrows.length) {
+    return;
+  }
+  state.relations = state.relations.filter((relation) => !(relation.terms ?? []).some((term) => term.monomial.some((arrow) => removedArrows.includes(arrow))));
+  clearAmbiguityResults(state);
+  refreshRelationsOutput(state);
+}
+
+// src/frontend/cytoscape-view.ts
+function applyCytoscapeTheme(state) {
+  if (!state.cy) {
+    return;
+  }
+  state.cy.style(cytoStyle());
+  if (state.selectedRelationIndex >= 0) {
+    selectRelation(state, state.selectedRelationIndex);
+  }
+}
+function promptNameAndCheck(message, cyInstance, type, state) {
+  const autoName = document.getElementById("autoName")?.checked ?? false;
+  if (autoName) {
+    const prefix2 = type === "vertex" ? "v" : "a";
+    let counter = type === "vertex" ? state.autoNameVertexCounter : state.autoNameArrowCounter;
+    let name2 = `${prefix2}${counter}`;
+    while (cyInstance && cyInstance.getElementById(name2).length !== 0) {
+      counter += 1;
+      name2 = `${prefix2}${counter}`;
+    }
+    if (type === "vertex") {
+      state.autoNameVertexCounter = counter + 1;
+    } else {
+      state.autoNameArrowCounter = counter + 1;
+    }
+    return name2;
+  }
+  const name = prompt(message);
+  if (!name) {
+    return null;
+  }
+  if (cyInstance && cyInstance.getElementById(name).length !== 0) {
+    setError("Vertex/Arrow with this name already exists.");
+    return null;
+  }
+  return name;
+}
+function clickOnCanvas(event, cyInstance, state) {
+  const target = event.target;
+  if (state.mode === "add") {
+    if (target === cyInstance) {
+      const name = promptNameAndCheck("Enter name for new vertex:", cyInstance, "vertex", state);
+      if (name) {
+        cyInstance.add({
+          group: "nodes",
+          data: { id: name },
+          position: event.position
+        });
+      }
+    } else if (target.isNode()) {
+      if (state.addingArrow) {
+        const name = promptNameAndCheck("Enter name for new arrow:", cyInstance, "arrow", state);
+        if (name) {
+          cyInstance.add({
+            group: "edges",
+            data: {
+              id: name,
+              source: state.sourceNodeId,
+              target: target.id(),
+              label: name
+            }
+          });
+          state.addingArrow = false;
+          state.sourceNodeId = null;
+          setTimeout(() => target.unselect(), 50);
+        }
+      } else {
+        state.addingArrow = true;
+        state.sourceNodeId = target.id();
+      }
+    }
+    return;
+  }
+  if (state.mode === "delete") {
+    if (target !== cyInstance) {
+      let removedArrows = [];
+      if (target.isNode()) {
+        removedArrows = target.connectedEdges().map((edge) => edge.id());
+      } else if (target.isEdge()) {
+        removedArrows = [target.id()];
+      }
+      cyInstance.remove(target);
+      removeRelationsUsingArrows(state, removedArrows);
+    }
+    return;
+  }
+  if (state.mode === "rename" && target !== cyInstance) {
+    const oldId = target.id();
+    const type = target.isNode() ? "vertex" : "arrow";
+    const newName = promptNameAndCheck(`Enter new name for ${type} (current: ${oldId}):`, cyInstance, type, state);
+    target.unselect();
+    if (!newName) {
+      return;
+    }
+    if (target.isNode()) {
+      const edges = target.connectedEdges();
+      const edgesJson = edges.jsons();
+      const nodeJson = target.json();
+      cyInstance.remove(target);
+      nodeJson.data.id = newName;
+      cyInstance.add(nodeJson);
+      edgesJson.forEach((edge) => {
+        if (edge.data.source === oldId) {
+          edge.data.source = newName;
+        }
+        if (edge.data.target === oldId) {
+          edge.data.target = newName;
+        }
+        cyInstance.add(edge);
+      });
+    } else {
+      const edgeJson = target.json();
+      cyInstance.remove(target);
+      edgeJson.data.id = newName;
+      edgeJson.data.label = newName;
+      cyInstance.add(edgeJson);
+      renameArrowInRelations(oldId, newName, state.relations, cyInstance, state);
+    }
+  }
+}
+function initCytoscape(state, inputData, isPreset = false) {
+  const layout = isPreset ? { name: "preset", fit: false } : {
+    name: "breadthfirst",
+    fit: true,
+    padding: 20,
+    nodeDimensionsIncludeLabels: true
+  };
+  const cyInstance = cytoscape({
+    container: document.getElementById("cy"),
+    elements: inputData,
+    style: cytoStyle(),
+    layout,
+    selectionType: "single",
+    userZoomingEnabled: true,
+    userPanningEnabled: true,
+    wheelSensitivity: 0.5,
+    pan: { x: 40, y: 40 }
+  });
+  cyInstance.on("tap", (event) => clickOnCanvas(event, cyInstance, state));
+  state.cy = cyInstance;
+  window.cy = cyInstance;
+  return cyInstance;
+}
+function presentData(state, quiver, relations, isPreset = false) {
+  state.quiverData = quiver;
+  state.relations = relations;
+  state.monomialComputationContext = null;
+  state.ambiguityGroupsByOrientation = null;
+  state.hochschildComplex = null;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
+  state.relationPanelTab = "relations";
+  refreshRelationsOutput(state);
+  ["saveSVG", "fixCyto", "wriggle", "toQPABtn"].forEach((id) => {
+    const button = document.getElementById(id);
+    if (button) {
+      button.disabled = false;
+    }
+  });
+  state.cy = initCytoscape(state, quiver, isPreset);
+}
+function bendArrow(state, direction) {
+  const edges = state.cy?.$("edge:selected");
+  if (!edges) {
+    return;
+  }
+  for (const edge of edges) {
+    const currentDistance = edge.style("control-point-distance");
+    let distance = 0;
+    if (direction === "L") {
+      distance = -40;
+    } else if (direction === "R") {
+      distance = 40;
+    }
+    if (currentDistance) {
+      const current = Number.parseInt(currentDistance.substring(0, currentDistance.indexOf("px")), 10);
+      if (current >= 0 && distance > 0 || current <= 0 && distance < 0) {
+        edge.style("control-point-distance", current + distance);
+      } else {
+        edge.style("control-point-distance", 0);
+      }
+      edge.style("control-point-weights", 0.5);
+    } else {
+      edge.style("control-point-weights", 0.5);
+      edge.style("control-point-distance", distance);
+    }
+    if (edge.codirectedEdges().length === 1) {
+      edge.style("curve-style", "unbundled-bezier");
+    }
+  }
+}
+function doubleQuiver(state) {
+  if (!state.cy) {
+    setError("Draw a quiver before doubling arrows.");
+    return;
+  }
+  const existingArrowIds = new Set(state.cy.edges().map((edge) => edge.id()));
+  const arrowsToDouble = state.cy.edges().filter((edge) => !edge.id().endsWith("*"));
+  const reverseArrows = [];
+  const skipped = [];
+  for (const edge of arrowsToDouble) {
+    const reverseId = `${edge.id()}*`;
+    if (existingArrowIds.has(reverseId)) {
+      skipped.push(reverseId);
+      continue;
+    }
+    reverseArrows.push({
+      group: "edges",
+      data: {
+        id: reverseId,
+        source: edge.data("target"),
+        target: edge.data("source"),
+        label: reverseId
+      }
+    });
+  }
+  if (reverseArrows.length > 0) {
+    state.monomialComputationContext = null;
+    state.ambiguityGroupsByOrientation = null;
+    state.hochschildComplex = null;
+    state.selectedAmbiguityId = null;
+    state.selectedHochschildBasisId = null;
+    state.relationPanelTab = "relations";
+    refreshRelationsOutput(state);
+    state.cy.add(reverseArrows);
+    state.cy.forceRender();
+  }
+  setOutputHtml([
+    `Added ${reverseArrows.length} reverse arrow(s).`,
+    skipped.length > 0 ? `Skipped existing reverse arrow(s): ${skipped.join(", ")}` : ""
+  ].filter(Boolean).join("<br>"));
+}
+function clearAll(state) {
+  state.addRelationMode = false;
+  state.quiverData = null;
+  state.relations = [];
+  state.monomialComputationContext = null;
+  state.ambiguityGroupsByOrientation = null;
+  state.hochschildComplex = null;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
+  state.relationPanelTab = "relations";
+  state.cy = null;
+  const quiverInput = document.getElementById("inQuiver");
+  const relationInput = document.getElementById("inRelation");
+  if (quiverInput) {
+    quiverInput.value = "";
+  }
+  if (relationInput) {
+    relationInput.value = "";
+  }
+  ["toQPABtn", "fixCyto", "wriggle", "saveSVG"].forEach((id) => {
+    const button = document.getElementById(id);
+    if (button) {
+      button.disabled = true;
+    }
+  });
+  refreshRelationsOutput(state);
+}
+function createInitialVertexAtClick(state, event) {
+  if (state.cy || state.mode !== "add") {
+    return;
+  }
+  const name = promptNameAndCheck("Enter name for new vertex:", null, "vertex", state);
+  if (!name) {
+    return;
+  }
+  const element = {
+    group: "nodes",
+    data: { id: name },
+    position: { x: event.offsetX - 40, y: event.offsetY - 40 }
+  };
+  state.quiverData = { nodes: [element], edges: [] };
+  state.cy = initCytoscape(state, state.quiverData, true);
+  ["toQPABtn", "fixCyto", "wriggle", "saveSVG"].forEach((id) => {
+    const button = document.getElementById(id);
+    if (button) {
+      button.disabled = false;
+    }
+  });
+}
+
+// src/frontend/file-actions.ts
+function saveFile(state, type) {
+  if (!state.cy) {
+    return;
+  }
+  let content;
+  let blob;
+  if (type === "svg") {
+    content = state.cy.svg({ scale: 1, full: true, bg: "#ffffff" });
+    blob = new Blob([content], { type: "image/svg+xml;charset=utf-8" });
+  } else {
+    content = JSON.stringify({ cy: state.cy.json(), reln: state.relations });
+    blob = new Blob([content], { type: "application/json;charset=utf-8" });
+  }
+  const filename = document.getElementById("filenameInput")?.value ?? "quiver";
+  saveAs(blob, `${filename}.${type}`);
+}
+function loadJsonFile(state, file) {
+  const reader = new FileReader;
+  reader.addEventListener("load", () => {
+    const result = JSON.parse(`${reader.result}`);
+    presentData(state, result.cy.elements, result.reln, true);
+  });
+  reader.readAsText(file);
+}
+function translateToQpa(state) {
+  if (!state.cy) {
+    return;
+  }
+  const qpaCode = exportQpa(state.cy.json().elements, state.relations);
+  setOutputHtml(qpaCode);
+}
+
+// src/frontend/theme.ts
+function initialTheme() {
+  const savedTheme = localStorage.getItem("gapToCytoTheme");
+  if (savedTheme === "light" || savedTheme === "dark") {
+    return savedTheme;
+  }
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+function applyTheme(state, theme) {
+  document.body.dataset.theme = theme;
+  const themeToggle = document.getElementById("themeToggle");
+  if (!themeToggle) {
+    return;
+  }
+  const isDark = theme === "dark";
+  themeToggle.textContent = isDark ? "Light theme" : "Dark theme";
+  themeToggle.setAttribute("aria-pressed", isDark ? "true" : "false");
+  applyCytoscapeTheme(state);
+}
+function toggleTheme(state) {
+  const currentTheme = document.body.dataset.theme ?? initialTheme();
+  const nextTheme = currentTheme === "dark" ? "light" : "dark";
+  localStorage.setItem("gapToCytoTheme", nextTheme);
+  applyTheme(state, nextTheme);
+}
+
+// src/backend/chainCpx.ts
+function assertNonNegativeCochainDegree(k) {
+  if (!Number.isInteger(k) || k < 0) {
+    throw new RangeError("Hochschild cochain degrees must be non-negative integers.");
+  }
+}
+function makeLazySequence(assertIndex, compute) {
+  const cache = new Map;
+  let sequence;
+  sequence = {
+    getAt(index) {
+      assertIndex(index);
+      if (!cache.has(index)) {
+        cache.set(index, compute(index));
+      }
+      return cache.get(index);
+    },
+    *getIteratorFrom(start) {
+      assertIndex(start);
+      let index = start;
+      while (true) {
+        yield [index, sequence.getAt(index)];
+        index += 1;
+      }
+    },
+    getArray(start, endInclusive) {
+      assertIndex(start);
+      if (endInclusive < start) {
+        return [];
+      }
+      const result = [];
+      for (let index = start;index <= endInclusive; index += 1) {
+        result.push([index, sequence.getAt(index)]);
+      }
+      return result;
+    }
+  };
+  return sequence;
+}
+function pathKey(path) {
+  return `${path.source}:${path.target}:${printArrowWord(path.arrows)}`;
+}
+function wordsEqual2(left, right) {
+  return left.length === right.length && left.every((arrow, index) => arrow === right[index]);
+}
+function r2lWord(path) {
+  return path.orientation === "R2L" ? [...path.arrows] : [...path.arrows].reverse();
+}
+function pathFromL2RWord(quiver, arrows, emptyVertexId) {
+  if (arrows.length === 0) {
+    return vertexPath(emptyVertexId, "L2R");
+  }
+  const first = arrowById(quiver, arrows[0]);
+  if (!first) {
+    return null;
+  }
+  let previous = first;
+  for (const arrowId of arrows.slice(1)) {
+    const next = arrowById(quiver, arrowId);
+    if (!next || previous.target !== next.source) {
+      return null;
+    }
+    previous = next;
+  }
+  return {
+    arrows: [...arrows],
+    source: first.source,
+    target: previous.target,
+    orientation: "L2R"
+  };
+}
+function occurrencesOfWord(word, subword) {
+  if (subword.length === 0 || subword.length > word.length) {
+    return [];
+  }
+  const starts = [];
+  for (let start = 0;start <= word.length - subword.length; start += 1) {
+    if (wordsEqual2(word.slice(start, start + subword.length), subword)) {
+      starts.push(start);
+    }
+  }
+  return starts;
+}
+function termBasisKey(element) {
+  return `${pathKey(underlyingPathOfAmbiguity(element.ambiguity))}||${pathKey(element.basisPath)}`;
+}
+function addSparseEntry(values, row, col, value) {
+  const key = `${row}:${col}`;
+  values.set(key, (values.get(key) ?? 0) + value);
+}
+function multiplyR2LWordsInA(quiver, admissibleBasisByKey, targetAmbiguity, factors) {
+  const productR2L = factors.flat();
+  const targetPath = underlyingPathOfAmbiguity(targetAmbiguity);
+  const productL2R = [...productR2L].reverse();
+  const emptyVertexId = targetPath.source === targetPath.target ? targetPath.source : "";
+  if (productL2R.length === 0 && emptyVertexId === "") {
+    return null;
+  }
+  const productPath = pathFromL2RWord(quiver, productL2R, emptyVertexId);
+  if (!productPath) {
+    return null;
+  }
+  if (productPath.source !== targetPath.source || productPath.target !== targetPath.target) {
+    return null;
+  }
+  return admissibleBasisByKey.get(pathKey(productPath)) ?? null;
+}
+function buildTerm(degree, ambiguities, admissibleBasis) {
+  const basis = [];
+  for (const ambiguity of ambiguities) {
+    const ambiguityPath = underlyingPathOfAmbiguity(ambiguity);
+    for (const basisPath of admissibleBasis) {
+      if (basisPath.source === ambiguityPath.source && basisPath.target === ambiguityPath.target) {
+        basis.push({ ambiguity, basisPath });
+      }
+    }
+  }
+  return {
+    degree,
+    basis,
+    dimension: basis.length
+  };
+}
+function coboundaryImageEntries(quiver, admissibleBasisByKey, targetBasisByKey, cochainIndex, source, targetAmbiguity) {
+  const sourceWord = r2lWord(underlyingPathOfAmbiguity(source.ambiguity));
+  const targetWord = r2lWord(underlyingPathOfAmbiguity(targetAmbiguity));
+  const basisWord = r2lWord(source.basisPath);
+  const paperIndex = cochainIndex + 1;
+  const entries = [];
+  if (paperIndex % 2 === 0) {
+    for (const start of occurrencesOfWord(targetWord, sourceWord)) {
+      const left = targetWord.slice(0, start);
+      const right = targetWord.slice(start + sourceWord.length);
+      if (right.length === 0) {
+        const product = multiplyR2LWordsInA(quiver, admissibleBasisByKey, targetAmbiguity, [left, basisWord]);
+        if (product) {
+          const row = targetBasisByKey.get(`${pathKey(underlyingPathOfAmbiguity(targetAmbiguity))}||${pathKey(product)}`);
+          if (row !== undefined) {
+            entries.push({ row, value: 1 });
+          }
+        }
+      }
+      if (left.length === 0) {
+        const product = multiplyR2LWordsInA(quiver, admissibleBasisByKey, targetAmbiguity, [basisWord, right]);
+        if (product) {
+          const row = targetBasisByKey.get(`${pathKey(underlyingPathOfAmbiguity(targetAmbiguity))}||${pathKey(product)}`);
+          if (row !== undefined) {
+            entries.push({ row, value: -1 });
+          }
+        }
+      }
+    }
+    return entries;
+  }
+  const seenRightRemainders = new Set;
+  for (const start of occurrencesOfWord(targetWord, sourceWord)) {
+    const left = targetWord.slice(0, start);
+    const right = targetWord.slice(start + sourceWord.length);
+    const rightKey = printArrowWord(right);
+    if (seenRightRemainders.has(rightKey)) {
+      continue;
+    }
+    seenRightRemainders.add(rightKey);
+    const product = multiplyR2LWordsInA(quiver, admissibleBasisByKey, targetAmbiguity, [left, basisWord, right]);
+    if (!product) {
+      continue;
+    }
+    const row = targetBasisByKey.get(`${pathKey(underlyingPathOfAmbiguity(targetAmbiguity))}||${pathKey(product)}`);
+    if (row !== undefined) {
+      entries.push({ row, value: 1 });
+    }
+  }
+  return entries;
+}
+function buildHochschildCochainComplexFromContext(context) {
+  const admissible = context.admissiblePathEnumeration;
+  const ambiguityComputation = context.ambiguityComputation;
+  const admissibleBasisByKey = new Map(admissible.paths.map((path) => [pathKey(path), path]));
+  let terms;
+  terms = makeLazySequence(assertNonNegativeCochainDegree, (degree) => buildTerm(degree, ambiguityComputation.primaryLeftR2L.getAt(degree), admissible.paths));
+  const coboundaries = makeLazySequence(assertNonNegativeCochainDegree, (degree) => {
+    const source = terms.getAt(degree);
+    const target = terms.getAt(degree + 1);
+    const targetBasisByKey = new Map(target.basis.map((element, index) => [
+      termBasisKey(element),
+      index
+    ]));
+    const values = new Map;
+    const targetAmbiguities = [
+      ...new Map(target.basis.map((element) => [
+        pathKey(underlyingPathOfAmbiguity(element.ambiguity)),
+        element.ambiguity
+      ])).values()
+    ];
+    source.basis.forEach((sourceElement, col) => {
+      for (const targetAmbiguity of targetAmbiguities) {
+        for (const entry of coboundaryImageEntries(admissible.relationGenerators.quiver, admissibleBasisByKey, targetBasisByKey, degree, sourceElement, targetAmbiguity)) {
+          addSparseEntry(values, entry.row, col, entry.value);
+        }
+      }
+    });
+    return normalizeSparseMatrix({
+      rows: target.dimension,
+      cols: source.dimension,
+      entries: [...values.entries()].map(([key, value]) => {
+        const [row, col] = key.split(":").map(Number);
+        return { row, col, value };
+      })
+    });
+  });
+  return {
+    terms,
+    coboundaries,
+    field: "Q",
+    logs: ["Computing in rationals."],
+    admissiblePathEnumeration: admissible,
+    ambiguityComputation
+  };
+}
+function normalizeSparseMatrix(matrix) {
+  const values = new Map;
+  for (const entry of matrix.entries) {
+    const key = `${entry.row}:${entry.col}`;
+    values.set(key, (values.get(key) ?? 0) + entry.value);
+  }
+  return {
+    rows: matrix.rows,
+    cols: matrix.cols,
+    entries: [...values.entries()].map(([key, value]) => {
+      const [row, col] = key.split(":").map(Number);
+      return { row, col, value };
+    }).filter((entry) => entry.value !== 0).sort((left, right) => left.row === right.row ? left.col - right.col : left.row - right.row)
+  };
+}
+function composeSparseMatrices(left, right) {
+  if (left.cols !== right.rows) {
+    throw new Error(`Cannot compose matrices with dimensions ${left.rows} x ${left.cols} and ${right.rows} x ${right.cols}.`);
+  }
+  const values = new Map;
+  const leftByCol = new Map;
+  for (const entry of left.entries) {
+    const entries = leftByCol.get(entry.col) ?? [];
+    entries.push(entry);
+    leftByCol.set(entry.col, entries);
+  }
+  for (const rightEntry of right.entries) {
+    for (const leftEntry of leftByCol.get(rightEntry.row) ?? []) {
+      addSparseEntry(values, leftEntry.row, rightEntry.col, leftEntry.value * rightEntry.value);
+    }
+  }
+  return normalizeSparseMatrix({
+    rows: left.rows,
+    cols: right.cols,
+    entries: [...values.entries()].map(([key, value]) => {
+      const [row, col] = key.split(":").map(Number);
+      return { row, col, value };
+    })
+  });
+}
+function checkHochschildDifferential(complex, startDegree, endDegreeInclusive) {
+  assertNonNegativeCochainDegree(startDegree);
+  assertNonNegativeCochainDegree(endDegreeInclusive);
+  if (endDegreeInclusive < startDegree) {
+    return {
+      ok: true,
+      checkedThroughDegree: endDegreeInclusive
+    };
+  }
+  for (let degree = startDegree;degree <= endDegreeInclusive; degree += 1) {
+    const composite = composeSparseMatrices(complex.coboundaries.getAt(degree + 1), complex.coboundaries.getAt(degree));
+    if (composite.entries.length > 0) {
+      return {
+        ok: false,
+        checkedThroughDegree: degree,
+        failure: {
+          degree,
+          entries: composite.entries
+        }
+      };
+    }
+  }
+  return {
+    ok: true,
+    checkedThroughDegree: endDegreeInclusive
+  };
+}
+
 // src/frontend/computation-controller.ts
 var DEFAULT_COMPUTE_TERM_BOUND = 5;
 var COMPUTATION_LOG_PREFIX = "[GAPCytoEx ambiguity]";
@@ -2314,6 +2881,70 @@ function formatOrientation2(orientation) {
 function termCountText(maxDegree) {
   return `${maxDegree} ${maxDegree === 1 ? "term" : "terms"}`;
 }
+function monomialComputationLogs(context) {
+  if (context.admissiblePathEnumeration.reachedMaxPathLength) {
+    return [
+      `Reached maxPathLength ${context.verified.maxPathLength}; admissible path enumeration may not have exhausted every basis path.`
+    ];
+  }
+  const loewyLength = Math.max(...context.admissiblePathEnumeration.paths.map((path) => path.arrows.length), 0) + 1;
+  return [`Computing monomial algebra of Loewy length ${loewyLength} -> all admissible paths enumerated.`];
+}
+function buildMonomialComputationContext(state, quiver, maxPathLength) {
+  if (state.monomialComputationContext?.verified.maxPathLength === maxPathLength) {
+    return state.monomialComputationContext;
+  }
+  state.ambiguityGroupsByOrientation = null;
+  state.hochschildComplex = null;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
+  const verified = tidyUpRelationDataAlgebra({
+    quiver,
+    relations: state.relations,
+    activeOrientation: state.activePathOrientation,
+    maxPathLength,
+    fieldCharacteristic: state.activeFieldCharacteristic
+  });
+  const admissiblePathEnumeration = enumerateAdmissiblePathsFromVerified(verified);
+  const ambiguityComputation = computeAmbiguitiesFromVerified(verified, maxPathLength);
+  state.monomialComputationContext = {
+    verified,
+    admissiblePathEnumeration,
+    ambiguityComputation
+  };
+  return state.monomialComputationContext;
+}
+function formatAmbiguityWarningTerms(context) {
+  return context.ambiguityComputation.warnings.flatMap((warning) => [
+    warning.message,
+    `R2L Gamma[${warning.degree}]: ${warning.leftR2L.map((ambiguity) => underlyingPathOfAmbiguity(ambiguity).arrows.join("·") || `(${underlyingPathOfAmbiguity(ambiguity).target})`).join(", ") || "(empty)"}`,
+    `L2R Gamma[${warning.degree}]: ${warning.rightL2R.map((ambiguity) => underlyingPathOfAmbiguity(ambiguity).arrows.join("·") || `(${underlyingPathOfAmbiguity(ambiguity).target})`).join(", ") || "(empty)"}`
+  ]);
+}
+function appendLogLines(lines) {
+  appendOutputHtml(lines.map(escapeHtml).join("<br>"));
+}
+function appendLogGroups(groups) {
+  groups.filter((group) => group.length > 0).forEach(appendLogLines);
+}
+function appendWarningLogLines(lines) {
+  appendOutputHtml(lines.map((line) => `<div class="status-warn">${escapeHtml(line)}</div>`).join(""));
+}
+function storeAmbiguityGroups(state, context, maxDegree, logOnlyLastTerm) {
+  const ambiguityGroupsR2L = getLazySequenceTerms(context.ambiguityComputation.primaryLeftR2L, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
+    degree,
+    ambiguities
+  }));
+  const ambiguityGroupsL2R = getLazySequenceTerms(context.ambiguityComputation.checkRightL2R, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
+    degree,
+    ambiguities
+  }));
+  state.ambiguityGroupsByOrientation = {
+    L2R: ambiguityGroupsL2R,
+    R2L: ambiguityGroupsR2L
+  };
+  state.selectedAmbiguityId = null;
+}
 function computeAndRenderAmbiguities(state) {
   const quiver = currentQuiver(state);
   if (!quiver) {
@@ -2336,13 +2967,8 @@ function computeAndRenderAmbiguities(state) {
     });
     console.time(`${COMPUTATION_LOG_PREFIX} total`);
     console.time(`${COMPUTATION_LOG_PREFIX} tidy algebra`);
-    const verified = tidyUpRelationDataAlgebra({
-      quiver,
-      relations: state.relations,
-      activeOrientation: state.activePathOrientation,
-      maxPathLength,
-      fieldCharacteristic: state.activeFieldCharacteristic
-    });
+    const context = buildMonomialComputationContext(state, quiver, maxPathLength);
+    const verified = context.verified;
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} tidy algebra`);
     console.log("verified algebra", {
       arrows: verified.quiver.arrows.length,
@@ -2352,34 +2978,24 @@ function computeAndRenderAmbiguities(state) {
       logs: verified.logs.map((entry) => entry.message)
     });
     console.time(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
-    const computation = computeAmbiguitiesFromVerified(verified, maxDegree);
+    const computation = context.ambiguityComputation;
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
     console.time(`${COMPUTATION_LOG_PREFIX} render requested terms`);
-    const ambiguityGroupsR2L = getLazySequenceTerms(computation.primaryLeftR2L, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
-      degree,
-      ambiguities
-    }));
-    const ambiguityGroupsL2R = getLazySequenceTerms(computation.checkRightL2R, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
-      degree,
-      ambiguities
-    }));
-    state.ambiguityGroupsByOrientation = {
-      L2R: ambiguityGroupsL2R,
-      R2L: ambiguityGroupsR2L
-    };
-    state.selectedAmbiguityId = null;
+    storeAmbiguityGroups(state, context, maxDegree, logOnlyLastTerm);
     refreshAmbiguitiesOutput(state);
     setRelationPanelTab(state, "ambiguities");
     for (const { degree, ambiguities } of state.ambiguityGroupsByOrientation[state.activePathOrientation]) {
       console.log("render term", { degree, ambiguities: ambiguities.length });
     }
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} render requested terms`);
-    const logLines = [`Ambiguities computed up to ${termCountText(maxDegree)}.`];
-    for (const warning of computation.warnings) {
-      logLines.push(warning.message);
-    }
-    appendOutputHtml(logLines.join("<br>"));
-    setInfoStatus(computation.warnings.length > 0 ? computation.warnings[0].message : "Ambiguities computed.");
+    const ambiguityLogLines = [
+      `Ambiguities computed up to ${termCountText(maxDegree)}.`
+    ];
+    ambiguityLogLines.push(...formatAmbiguityWarningTerms(context));
+    appendLogGroups([
+      monomialComputationLogs(context),
+      ambiguityLogLines
+    ]);
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} total`);
     console.groupEnd();
   } catch (error) {
@@ -2387,12 +3003,70 @@ function computeAndRenderAmbiguities(state) {
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} total`);
     console.groupEnd();
     if (error instanceof MonomialAlgebraError) {
-      appendOutputHtml(error.logs.map((entry) => `<div class="status-warn">${escapeHtml(entry.message)}</div>`).join(""));
-      setInfoStatus("Ambiguity computation blocked: relations are not monomial.", true);
+      appendWarningLogLines(error.logs.map((entry) => entry.message));
+      setInfoStatus("Relations are not monomial.", true);
       return;
     }
     setError(error.message);
     setInfoStatus("Ambiguity computation failed.", true);
+  }
+}
+function computeAndRenderHochschildComplex(state) {
+  const quiver = currentQuiver(state);
+  if (!quiver) {
+    setError("Draw a quiver before computing the Hochschild cochain complex.");
+    return;
+  }
+  try {
+    const maxPathLength = maxPathLengthValue();
+    const maxDegree = computeTermBoundValue();
+    const logOnlyLastTerm = logOnlyLastTermValue();
+    const context = buildMonomialComputationContext(state, quiver, maxPathLength);
+    const complex = buildHochschildCochainComplexFromContext(context);
+    const terms = complex.terms.getArray(0, maxDegree);
+    const coboundaries = maxDegree > 0 ? complex.coboundaries.getArray(0, maxDegree - 1) : [];
+    const previousCheckedThrough = state.hochschildComplex?.checkedDifferentialThrough ?? -1;
+    const checkStart = Math.max(0, previousCheckedThrough + 1);
+    const checkEnd = maxDegree - 1;
+    const differentialCheck = checkEnd >= checkStart ? checkHochschildDifferential(complex, checkStart, checkEnd) : { ok: true, checkedThroughDegree: previousCheckedThrough };
+    state.hochschildComplex = {
+      terms: terms.map(([, term]) => term),
+      coboundaries: coboundaries.map(([, matrix]) => matrix),
+      checkedDifferentialThrough: Math.max(previousCheckedThrough, differentialCheck.checkedThroughDegree)
+    };
+    if (!state.ambiguityGroupsByOrientation) {
+      storeAmbiguityGroups(state, context, maxDegree, logOnlyLastTerm);
+      refreshAmbiguitiesOutput(state);
+    }
+    refreshHochschildComplexOutput(state);
+    setRelationPanelTab(state, "hochschild-complex");
+    const ambiguityLogLines = [
+      `Ambiguities computed up to ${termCountText(maxDegree)}.`,
+      ...formatAmbiguityWarningTerms(context)
+    ];
+    const hochschildLogLines = [
+      `Hochschild cochain complex computed through C^${maxDegree}.`,
+      differentialCheck.ok ? `Checked d^{i + 1} d^i = 0 for ${checkStart <= checkEnd ? `${checkStart} <= i <= ${checkEnd}` : "no new differential pairs"}.` : `WARNING: d is not a differential at index ${differentialCheck.failure?.degree}.`,
+      ...terms.map(([degree, term]) => `C^${degree}: dimension ${term.dimension}`),
+      ...coboundaries.map(([degree, matrix]) => `d^${degree}: ${matrix.rows} x ${matrix.cols}, ${matrix.entries.length} nonzero ${matrix.entries.length === 1 ? "entry" : "entries"}`)
+    ];
+    appendLogGroups([
+      complex.logs,
+      monomialComputationLogs(context),
+      ambiguityLogLines,
+      hochschildLogLines
+    ]);
+    if (!differentialCheck.ok) {
+      setInfoStatus("d is not a differential.", true);
+    }
+  } catch (error) {
+    if (error instanceof MonomialAlgebraError) {
+      appendWarningLogLines(error.logs.map((entry) => entry.message));
+      setInfoStatus("Relations are not monomial.", true);
+      return;
+    }
+    setError(error.message);
+    setInfoStatus("Hochschild cochain computation failed.", true);
   }
 }
 
@@ -2400,9 +3074,72 @@ function computeAndRenderAmbiguities(state) {
 function bindClick(id, handler) {
   document.getElementById(id)?.addEventListener("click", (event) => handler(event));
 }
+var lastDrawnQpaInput = "";
+var RANK_4_NAKAYAMA_QPA = `Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],["v4","v1","d"]])
+[(+1)*a*b*c, (+1)*c*d*a]`;
+var ALOS_RANK_3_MONOMIAL_QPA = `Quiver(["v1","v2","v3"], [["v1","v2","a"],["v1","v3","b"],["v3","v2","c"],["v2","v1","z"]])
+[(+1)*z*b, (+1)*c*z, (+1)*a*z*a, (+1)*z*a*z]`;
+function cyclicArrowIndex(index, rank) {
+  return (index - 1) % rank + 1;
+}
+function cyclicBrauerStarRelation(rank, startIndex) {
+  const arrows = [];
+  for (let offset = 0;offset <= rank + 1; offset += 1) {
+    arrows.push(`a${cyclicArrowIndex(startIndex + offset, rank)}`);
+  }
+  return arrows.join("*");
+}
+function buildBrauerStarQpa(rank) {
+  const vertices = Array.from({ length: rank }, (_, index) => `"v${index + 1}"`);
+  const arrows = Array.from({ length: rank }, (_, index) => {
+    const source = index + 1;
+    const target = cyclicArrowIndex(source + 1, rank);
+    return `["v${source}","v${target}","a${source}"]`;
+  });
+  arrows.push(`["v1","v1","b"]`);
+  const cycle = Array.from({ length: rank }, (_, index) => `a${index + 1}`).join("*");
+  const relations = [
+    ...Array.from({ length: rank }, (_, index) => `(+1)*${cyclicBrauerStarRelation(rank, index + 1)}`),
+    `(+1)*b*b+(-1)*${cycle}`,
+    "(+1)*b*a1",
+    `(+1)*a${rank}*b`,
+    "(+1)*b*b*b"
+  ];
+  return `Quiver([${vertices.join(",")}], [${arrows.join(",")}])
+[${relations.join(", ")}]`;
+}
+function promptBrauerStarRank() {
+  const input = prompt("Rank n for Brauer star (1-9):", "3");
+  if (input === null) {
+    return;
+  }
+  const rank = Number(input);
+  if (!Number.isInteger(rank) || rank < 1 || rank >= 10) {
+    setError("rank-n Brauer star requires an integer rank n with 1 <= n < 10.");
+    return;
+  }
+  replaceQpaInput(buildBrauerStarQpa(rank));
+}
+function replaceQpaInput(value) {
+  const input = document.getElementById("inQuiver");
+  if (input) {
+    input.value = value;
+    updateDrawButtonLabel();
+  }
+}
+function currentQpaInputValue() {
+  return document.getElementById("inQuiver")?.value ?? "";
+}
+function updateDrawButtonLabel() {
+  const button = document.getElementById("translateBtn");
+  if (!button) {
+    return;
+  }
+  button.textContent = currentQpaInputValue() !== lastDrawnQpaInput ? "Update canvas" : "Draw to canvas";
+}
 function translateQpaFromInputs(state) {
   try {
-    const qpaInput = document.getElementById("inQuiver")?.value ?? "";
+    const qpaInput = currentQpaInputValue();
     const relationInput = document.getElementById("inRelation")?.value ?? "";
     const result = parseQpaInput(qpaInput, relationInput, {
       forceVertexIds: document.getElementById("forceID")?.checked ?? false,
@@ -2413,6 +3150,8 @@ function translateQpaFromInputs(state) {
     const nodes = result.elements.filter((element) => element.group === "nodes");
     const edges = result.elements.filter((element) => element.group === "edges");
     presentData(state, { nodes, edges }, result.relations);
+    lastDrawnQpaInput = qpaInput;
+    updateDrawButtonLabel();
   } catch (error) {
     setError(error.message);
   }
@@ -2432,12 +3171,20 @@ function bindWorkbenchEvents(state) {
   bindClick("btnEditReln", () => editSelectedRelation(state));
   bindClick("toQPABtn", () => translateToQpa(state));
   bindClick("computeAmbiguitiesBtn", () => computeAndRenderAmbiguities(state));
-  bindClick("resetCanvasRelations", () => clearAll(state));
+  bindClick("computeHochschildComplexBtn", () => computeAndRenderHochschildComplex(state));
+  bindClick("resetCanvasRelations", () => {
+    clearAll(state);
+    updateDrawButtonLabel();
+  });
   bindClick("clearOutput", () => setOutputHtml(""));
+  bindClick("rank4NakayamaPreset", () => replaceQpaInput(RANK_4_NAKAYAMA_QPA));
+  bindClick("alosRank3Preset", () => replaceQpaInput(ALOS_RANK_3_MONOMIAL_QPA));
+  bindClick("brauerStarPreset", () => promptBrauerStarRank());
   bindClick("clearQuiverInput", () => {
     const input = document.getElementById("inQuiver");
     if (input) {
       input.value = "";
+      updateDrawButtonLabel();
     }
   });
   bindClick("clearRelationInput", () => {
@@ -2452,6 +3199,7 @@ function bindWorkbenchEvents(state) {
       loadJsonFile(state, file);
     }
   });
+  document.getElementById("inQuiver")?.addEventListener("input", () => updateDrawButtonLabel());
   document.querySelectorAll('input[name="editMode"]').forEach((element) => {
     element.addEventListener("change", (event) => {
       const value = event.target.value;
@@ -2466,7 +3214,7 @@ function bindWorkbenchEvents(state) {
   document.querySelectorAll("[data-relation-panel-tab]").forEach((button) => {
     button.addEventListener("click", () => {
       const tab = button.dataset.relationPanelTab;
-      if (tab === "relations" || tab === "ambiguities") {
+      if (tab === "relations" || tab === "ambiguities" || tab === "hochschild-complex") {
         setRelationPanelTab(state, tab);
       }
     });
@@ -2483,8 +3231,10 @@ function bindWorkbenchEvents(state) {
       }
     });
   });
+  lastDrawnQpaInput = currentQpaInputValue();
   setPathOrientation(state, state.activePathOrientation);
   setFieldCharacteristic(0, false);
+  updateDrawButtonLabel();
   appendInfoLog("Ready.");
 }
 
@@ -2584,5 +3334,5 @@ maxPathLength?.addEventListener("input", () => {
 });
 bindWorkbenchEvents(state);
 
-//# debugId=1C183397E498C18C64756E2164756E21
+//# debugId=25D734055D82898864756E2164756E21
 //# sourceMappingURL=app.js.map

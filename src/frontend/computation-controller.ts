@@ -1,12 +1,22 @@
 import {
   computeAmbiguitiesFromVerified,
   getLazySequenceTerms,
+  underlyingPathOfAmbiguity,
 } from "../backend/ambiguities";
+import {
+  buildHochschildCochainComplexFromContext,
+  checkHochschildDifferential,
+  type HochschildCochainComplexContext
+} from "../backend/chainCpx";
 import type { PathOrientation } from "../backend/paths";
-import { tidyUpRelationDataAlgebra, MonomialAlgebraError } from "../backend/monomial-algebra";
+import {
+  enumerateAdmissiblePathsFromVerified,
+  tidyUpRelationDataAlgebra,
+  MonomialAlgebraError
+} from "../backend/monomial-algebra";
 import type { Quiver } from "../backend/quiver";
 import { appendOutputHtml, setError, setInfoStatus } from "./log-panel";
-import { refreshAmbiguitiesOutput, setRelationPanelTab } from "./relation-ui";
+import { refreshAmbiguitiesOutput, refreshHochschildComplexOutput, setRelationPanelTab } from "./relation-ui";
 import type { WorkbenchState } from "./workbench-state";
 
 const DEFAULT_COMPUTE_TERM_BOUND = 5;
@@ -62,6 +72,77 @@ function termCountText(maxDegree: number): string {
   return `${maxDegree} ${maxDegree === 1 ? "term" : "terms"}`;
 }
 
+function monomialComputationLogs(context: HochschildCochainComplexContext): string[] {
+  if (context.admissiblePathEnumeration.reachedMaxPathLength) {
+    return [
+      `Reached maxPathLength ${context.verified.maxPathLength}; admissible path enumeration may not have exhausted every basis path.`
+    ];
+  }
+  const loewyLength = Math.max(...context.admissiblePathEnumeration.paths.map((path) => path.arrows.length), 0) + 1;
+  return [`Computing monomial algebra of Loewy length ${loewyLength} -> all admissible paths enumerated.`];
+}
+
+function buildMonomialComputationContext(state: WorkbenchState, quiver: Quiver, maxPathLength: number): HochschildCochainComplexContext {
+  if (state.monomialComputationContext?.verified.maxPathLength === maxPathLength) {
+    return state.monomialComputationContext;
+  }
+  state.ambiguityGroupsByOrientation = null;
+  state.hochschildComplex = null;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
+  const verified = tidyUpRelationDataAlgebra({
+    quiver,
+    relations: state.relations,
+    activeOrientation: state.activePathOrientation,
+    maxPathLength,
+    fieldCharacteristic: state.activeFieldCharacteristic
+  });
+  const admissiblePathEnumeration = enumerateAdmissiblePathsFromVerified(verified);
+  const ambiguityComputation = computeAmbiguitiesFromVerified(verified, maxPathLength);
+  state.monomialComputationContext = {
+    verified,
+    admissiblePathEnumeration,
+    ambiguityComputation
+  };
+  return state.monomialComputationContext;
+}
+
+function formatAmbiguityWarningTerms(context: HochschildCochainComplexContext): string[] {
+  return context.ambiguityComputation.warnings.flatMap((warning) => [
+    warning.message,
+    `R2L Gamma[${warning.degree}]: ${warning.leftR2L.map((ambiguity) => underlyingPathOfAmbiguity(ambiguity).arrows.join("·") || `(${underlyingPathOfAmbiguity(ambiguity).target})`).join(", ") || "(empty)"}`,
+    `L2R Gamma[${warning.degree}]: ${warning.rightL2R.map((ambiguity) => underlyingPathOfAmbiguity(ambiguity).arrows.join("·") || `(${underlyingPathOfAmbiguity(ambiguity).target})`).join(", ") || "(empty)"}`
+  ]);
+}
+
+function appendLogLines(lines: string[]): void {
+  appendOutputHtml(lines.map(escapeHtml).join("<br>"));
+}
+
+function appendLogGroups(groups: string[][]): void {
+  groups.filter((group) => group.length > 0).forEach(appendLogLines);
+}
+
+function appendWarningLogLines(lines: string[]): void {
+  appendOutputHtml(lines.map((line) => `<div class="status-warn">${escapeHtml(line)}</div>`).join(""));
+}
+
+function storeAmbiguityGroups(state: WorkbenchState, context: HochschildCochainComplexContext, maxDegree: number, logOnlyLastTerm: boolean): void {
+  const ambiguityGroupsR2L = getLazySequenceTerms(context.ambiguityComputation.primaryLeftR2L, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
+    degree,
+    ambiguities
+  }));
+  const ambiguityGroupsL2R = getLazySequenceTerms(context.ambiguityComputation.checkRightL2R, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
+    degree,
+    ambiguities
+  }));
+  state.ambiguityGroupsByOrientation = {
+    L2R: ambiguityGroupsL2R,
+    R2L: ambiguityGroupsR2L
+  };
+  state.selectedAmbiguityId = null;
+}
+
 export function computeAndRenderAmbiguities(state: WorkbenchState): void {
   const quiver = currentQuiver(state);
   if (!quiver) {
@@ -85,13 +166,8 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
     });
     console.time(`${COMPUTATION_LOG_PREFIX} total`);
     console.time(`${COMPUTATION_LOG_PREFIX} tidy algebra`);
-    const verified = tidyUpRelationDataAlgebra({
-      quiver,
-      relations: state.relations,
-      activeOrientation: state.activePathOrientation,
-      maxPathLength,
-      fieldCharacteristic: state.activeFieldCharacteristic
-    });
+    const context = buildMonomialComputationContext(state, quiver, maxPathLength);
+    const verified = context.verified;
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} tidy algebra`);
     console.log("verified algebra", {
       arrows: verified.quiver.arrows.length,
@@ -101,22 +177,10 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
       logs: verified.logs.map((entry) => entry.message)
     });
     console.time(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
-    const computation = computeAmbiguitiesFromVerified(verified, maxDegree);
+    const computation = context.ambiguityComputation;
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} build/check ambiguity sequences`);
     console.time(`${COMPUTATION_LOG_PREFIX} render requested terms`);
-    const ambiguityGroupsR2L = getLazySequenceTerms(computation.primaryLeftR2L, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
-      degree,
-      ambiguities
-    }));
-    const ambiguityGroupsL2R = getLazySequenceTerms(computation.checkRightL2R, -1, maxDegree, logOnlyLastTerm).map(([degree, ambiguities]) => ({
-      degree,
-      ambiguities
-    }));
-    state.ambiguityGroupsByOrientation = {
-      L2R: ambiguityGroupsL2R,
-      R2L: ambiguityGroupsR2L
-    };
-    state.selectedAmbiguityId = null;
+    storeAmbiguityGroups(state, context, maxDegree, logOnlyLastTerm);
     refreshAmbiguitiesOutput(state);
     setRelationPanelTab(state, "ambiguities");
 
@@ -125,12 +189,14 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
     }
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} render requested terms`);
 
-    const logLines = [`Ambiguities computed up to ${termCountText(maxDegree)}.`];
-    for (const warning of computation.warnings) {
-      logLines.push(warning.message);
-    }
-    appendOutputHtml(logLines.join("<br>"));
-    setInfoStatus(computation.warnings.length > 0 ? computation.warnings[0].message : "Ambiguities computed.");
+    const ambiguityLogLines = [
+      `Ambiguities computed up to ${termCountText(maxDegree)}.`
+    ];
+    ambiguityLogLines.push(...formatAmbiguityWarningTerms(context));
+    appendLogGroups([
+      monomialComputationLogs(context),
+      ambiguityLogLines
+    ]);
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} total`);
     console.groupEnd();
   } catch (error) {
@@ -138,11 +204,75 @@ export function computeAndRenderAmbiguities(state: WorkbenchState): void {
     console.timeEnd(`${COMPUTATION_LOG_PREFIX} total`);
     console.groupEnd();
     if (error instanceof MonomialAlgebraError) {
-      appendOutputHtml(error.logs.map((entry) => `<div class="status-warn">${escapeHtml(entry.message)}</div>`).join(""));
-      setInfoStatus("Ambiguity computation blocked: relations are not monomial.", true);
+      appendWarningLogLines(error.logs.map((entry) => entry.message));
+      setInfoStatus("Relations are not monomial.", true);
       return;
     }
     setError((error as Error).message);
     setInfoStatus("Ambiguity computation failed.", true);
+  }
+}
+
+export function computeAndRenderHochschildComplex(state: WorkbenchState): void {
+  const quiver = currentQuiver(state);
+  if (!quiver) {
+    setError("Draw a quiver before computing the Hochschild cochain complex.");
+    return;
+  }
+
+  try {
+    const maxPathLength = maxPathLengthValue();
+    const maxDegree = computeTermBoundValue();
+    const logOnlyLastTerm = logOnlyLastTermValue();
+    const context = buildMonomialComputationContext(state, quiver, maxPathLength);
+    const complex = buildHochschildCochainComplexFromContext(context);
+    const terms = complex.terms.getArray(0, maxDegree);
+    const coboundaries = maxDegree > 0 ? complex.coboundaries.getArray(0, maxDegree - 1) : [];
+    const previousCheckedThrough = state.hochschildComplex?.checkedDifferentialThrough ?? -1;
+    const checkStart = Math.max(0, previousCheckedThrough + 1);
+    const checkEnd = maxDegree - 1;
+    const differentialCheck = checkEnd >= checkStart
+      ? checkHochschildDifferential(complex, checkStart, checkEnd)
+      : { ok: true, checkedThroughDegree: previousCheckedThrough };
+    state.hochschildComplex = {
+      terms: terms.map(([, term]) => term),
+      coboundaries: coboundaries.map(([, matrix]) => matrix),
+      checkedDifferentialThrough: Math.max(previousCheckedThrough, differentialCheck.checkedThroughDegree)
+    };
+    if (!state.ambiguityGroupsByOrientation) {
+      storeAmbiguityGroups(state, context, maxDegree, logOnlyLastTerm);
+      refreshAmbiguitiesOutput(state);
+    }
+    refreshHochschildComplexOutput(state);
+    setRelationPanelTab(state, "hochschild-complex");
+    const ambiguityLogLines = [
+      `Ambiguities computed up to ${termCountText(maxDegree)}.`,
+      ...formatAmbiguityWarningTerms(context)
+    ];
+    const hochschildLogLines = [
+      `Hochschild cochain complex computed through C^${maxDegree}.`,
+      differentialCheck.ok
+        ? `Checked d^{i + 1} d^i = 0 for ${checkStart <= checkEnd ? `${checkStart} <= i <= ${checkEnd}` : "no new differential pairs"}.`
+        : `WARNING: d is not a differential at index ${differentialCheck.failure?.degree}.`,
+      ...terms.map(([degree, term]) => `C^${degree}: dimension ${term.dimension}`),
+      ...coboundaries.map(([degree, matrix]) => `d^${degree}: ${matrix.rows} x ${matrix.cols}, ${matrix.entries.length} nonzero ${matrix.entries.length === 1 ? "entry" : "entries"}`)
+    ];
+    appendLogGroups([
+      complex.logs,
+      monomialComputationLogs(context),
+      ambiguityLogLines,
+      hochschildLogLines
+    ]);
+    if (!differentialCheck.ok) {
+      setInfoStatus("d is not a differential.", true);
+    }
+  } catch (error) {
+    if (error instanceof MonomialAlgebraError) {
+      appendWarningLogLines(error.logs.map((entry) => entry.message));
+      setInfoStatus("Relations are not monomial.", true);
+      return;
+    }
+    setError((error as Error).message);
+    setInfoStatus("Hochschild cochain computation failed.", true);
   }
 }

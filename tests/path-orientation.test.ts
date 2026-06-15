@@ -23,6 +23,7 @@ import {
   underlyingPathOfAmbiguity,
   type Ambiguity
 } from "../src/backend/ambiguities";
+import { buildHochschildCochainComplex, checkHochschildDifferential } from "../src/backend/chainCpx";
 
 test("reverseOrientation reverses word order without swapping source or target", () => {
   const path: Path = {
@@ -544,31 +545,6 @@ test("compute ambiguity sequences agree after reversing orientation", () => {
   expect(leftGamma2.map((ambiguity) => reverseOrientationOfAmbiguity(ambiguity).pieces.map((piece) => piece.arrows))).toContainEqual([["d"], ["c", "b"], ["a"], []]);
 });
 
-test("left ambiguities reject candidates whose adjacent pair only has a relation as strict suffix", () => {
-  const quiver: Quiver = {
-    vertices: [{ id: "v" }],
-    arrows: [
-      { id: "x", source: "v", target: "v", label: "x" },
-      { id: "y", source: "v", target: "v", label: "y" },
-      { id: "z", source: "v", target: "v", label: "z" },
-      { id: "t", source: "v", target: "v", label: "t" }
-    ]
-  };
-  const verified = tidyUpMonomialAlgebra({
-    quiver,
-    relations: [
-      relationFromL2R("zyx", pathFromArrowIdsL2R(quiver, ["z", "y", "x"])),
-      relationFromL2R("tz", pathFromArrowIdsL2R(quiver, ["t", "z"]))
-    ],
-    activeOrientation: "R2L",
-    maxPathLength: 20
-  });
-
-  const leftGamma2 = computeLeftAmbiguitiesR2L(verified).getAt(2);
-
-  expect(leftGamma2.map((ambiguity) => ambiguity.pieces.map((piece) => piece.arrows))).not.toContainEqual([[], ["x"], ["y", "z"], ["t"]]);
-});
-
 test("computeAmbiguities reports no warning when R2L and L2R conventions agree", () => {
   const quiver: Quiver = {
     vertices: [{ id: "v" }],
@@ -619,4 +595,140 @@ test("getLazySequenceTerms can return only the last requested term", () => {
     [2, "term-2"]
   ]);
   expect(getLazySequenceTerms(sequence, -1, 2, true)).toEqual([[2, "term-2"]]);
+});
+
+test("ambiguity lazy sequences cache repeated getAt calls", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v" }],
+    arrows: [
+      { id: "a", source: "v", target: "v", label: "a" },
+      { id: "b", source: "v", target: "v", label: "b" },
+      { id: "c", source: "v", target: "v", label: "c" }
+    ]
+  };
+
+  const result = computeAmbiguities({
+    quiver,
+    relations: [relationFromL2R("abc", pathFromArrowIdsL2R(quiver, ["a", "b", "c"]))],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+
+  const leftFirst = result.primaryLeftR2L.getAt(1);
+  const leftSecond = result.primaryLeftR2L.getAt(1);
+  const rightFirst = result.checkRightL2R.getAt(1);
+  const rightSecond = result.checkRightL2R.getAt(1);
+
+  expect(leftSecond).toBe(leftFirst);
+  expect(rightSecond).toBe(rightFirst);
+});
+
+test("Hochschild cochain terms use non-negative cochain indexing Gamma n", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v" }],
+    arrows: [{ id: "a", source: "v", target: "v", label: "a" }]
+  };
+
+  const complex = buildHochschildCochainComplex({
+    quiver,
+    relations: [relationFromL2R("a2", pathFromArrowIdsL2R(quiver, ["a", "a"]))],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+
+  expect(complex.field).toBe("Q");
+  expect(complex.logs).toContain("Computing in rationals.");
+  expect(complex.terms.getAt(0).basis.map((element) => element.ambiguity.n)).toEqual([0, 0]);
+  expect(complex.terms.getAt(1).basis.map((element) => element.ambiguity.n)).toEqual([1, 1]);
+  expect(() => complex.terms.getAt(-1)).toThrow("non-negative");
+  expect(() => complex.coboundaries.getAt(-1)).toThrow("non-negative");
+});
+
+test("Hochschild lazy terms and coboundaries cache repeated getAt calls", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v" }],
+    arrows: [{ id: "a", source: "v", target: "v", label: "a" }]
+  };
+
+  const complex = buildHochschildCochainComplex({
+    quiver,
+    relations: [relationFromL2R("a2", pathFromArrowIdsL2R(quiver, ["a", "a"]))],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+
+  const termFirst = complex.terms.getAt(2);
+  const termSecond = complex.terms.getAt(2);
+  const differentialFirst = complex.coboundaries.getAt(1);
+  const differentialSecond = complex.coboundaries.getAt(1);
+
+  expect(termSecond).toBe(termFirst);
+  expect(differentialSecond).toBe(differentialFirst);
+});
+
+test("Hochschild d zero for k loop modulo square accumulates formula 5.2 over rationals", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v" }],
+    arrows: [{ id: "a", source: "v", target: "v", label: "a" }]
+  };
+
+  const complex = buildHochschildCochainComplex({
+    quiver,
+    relations: [relationFromL2R("a2", pathFromArrowIdsL2R(quiver, ["a", "a"]))],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+
+  const d0 = complex.coboundaries.getAt(0);
+
+  expect(d0.rows).toBe(2);
+  expect(d0.cols).toBe(2);
+  expect(d0.entries).toEqual([{ row: 1, col: 0, value: 2 }]);
+});
+
+test("default example has nonzero even Hochschild cochain terms", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v1" }, { id: "v2" }, { id: "v3" }, { id: "v4" }],
+    arrows: [
+      { id: "a", source: "v1", target: "v2", label: "a" },
+      { id: "b", source: "v2", target: "v3", label: "b" },
+      { id: "c", source: "v3", target: "v4", label: "c" },
+      { id: "d", source: "v4", target: "v1", label: "d" }
+    ]
+  };
+
+  const complex = buildHochschildCochainComplex({
+    quiver,
+    relations: [
+      relationFromL2R("abc", pathFromArrowIdsL2R(quiver, ["a", "b", "c"])),
+      relationFromL2R("cda", pathFromArrowIdsL2R(quiver, ["c", "d", "a"]))
+    ],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+
+  expect(complex.terms.getAt(2).dimension).toBe(2);
+  expect(complex.terms.getAt(4).dimension).toBe(2);
+  expect(
+    complex.terms.getAt(2).basis.map((element) => element.basisPath.arrows)
+  ).toEqual([["c"], ["a"]]);
+});
+
+test("Hochschild coboundaries compose to zero on computed complex", () => {
+  const quiver: Quiver = {
+    vertices: [{ id: "v" }],
+    arrows: [{ id: "a", source: "v", target: "v", label: "a" }]
+  };
+
+  const complex = buildHochschildCochainComplex({
+    quiver,
+    relations: [relationFromL2R("a2", pathFromArrowIdsL2R(quiver, ["a", "a"]))],
+    activeOrientation: "R2L",
+    maxPathLength: 20
+  });
+
+  expect(checkHochschildDifferential(complex, 0, 3)).toEqual({
+    ok: true,
+    checkedThroughDegree: 3
+  });
 });

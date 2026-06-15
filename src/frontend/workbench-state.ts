@@ -2,13 +2,20 @@ import type { RelationData } from "../backend/relations";
 import type { CytoscapeElementData } from "../backend/qpa-translator";
 import type { PathOrientation } from "../backend/paths";
 import type { Ambiguity } from "../backend/ambiguities";
+import type { CochainSpace, HochschildCochainComplexContext, SparseMatrix } from "../backend/chainCpx";
 
 export type EditMode = "default" | "add" | "rename" | "delete";
-export type RelationPanelTab = "relations" | "ambiguities";
+export type RelationPanelTab = "relations" | "ambiguities" | "hochschild-complex";
 
 export interface AmbiguityDegreeGroup {
   degree: number;
   ambiguities: Ambiguity[];
+}
+
+export interface HochschildComplexDisplayData {
+  terms: CochainSpace[];
+  coboundaries: SparseMatrix[];
+  checkedDifferentialThrough: number;
 }
 
 export interface WorkbenchState {
@@ -25,8 +32,11 @@ export interface WorkbenchState {
   animationTimer: ReturnType<typeof setInterval> | null;
   activePathOrientation: PathOrientation;
   activeFieldCharacteristic: number;
+  monomialComputationContext: HochschildCochainComplexContext | null;
   ambiguityGroupsByOrientation: Record<PathOrientation, AmbiguityDegreeGroup[]> | null;
+  hochschildComplex: HochschildComplexDisplayData | null;
   selectedAmbiguityId: string | null;
+  selectedHochschildBasisId: string | null;
   relationPanelTab: RelationPanelTab;
 }
 
@@ -45,8 +55,11 @@ export function createWorkbenchState(): WorkbenchState {
     animationTimer: null,
     activePathOrientation: "L2R",
     activeFieldCharacteristic: 0,
+    monomialComputationContext: null,
     ambiguityGroupsByOrientation: null,
+    hochschildComplex: null,
     selectedAmbiguityId: null,
+    selectedHochschildBasisId: null,
     relationPanelTab: "relations"
   };
 }

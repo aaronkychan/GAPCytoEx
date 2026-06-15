@@ -772,10 +772,9 @@ function containsRelationGenerator(
     );
 }
 
-export function enumerateAdmissiblePaths(
-    input: MonomialAlgebraInput,
+export function enumerateAdmissiblePathsFromVerified(
+    relationGenerators: VerifiedMonomialAlgebra,
 ): AdmissiblePathEnumeration {
-    const relationGenerators = tidyUpMonomialAlgebra(input);
     const logs = [...relationGenerators.logs];
     const paths: Path[] = [];
     const seen = new Set<string>();
@@ -871,4 +870,10 @@ export function enumerateAdmissiblePaths(
         reachedMaxPathLength,
         finiteDimensionalityConfirmed: !reachedMaxPathLength,
     };
+}
+
+export function enumerateAdmissiblePaths(
+    input: MonomialAlgebraInput,
+): AdmissiblePathEnumeration {
+    return enumerateAdmissiblePathsFromVerified(tidyUpMonomialAlgebra(input));
 }

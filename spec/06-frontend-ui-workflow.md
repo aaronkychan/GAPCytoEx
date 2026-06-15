@@ -40,7 +40,7 @@ Current Stage 1 decisions:
 
 The existing text boxes should not dominate the opening view. They remain available for import/export or debugging.
 
-The previous two-output mockup is rejected. Do not implement a separate `Output details` region below or beside a smaller output region. All translator output, compute controls, ambiguity rows, Hochschild-complex/cohomology/cup-product rows, copy/export actions, warnings, and errors belong in the single `OutputPanel`.
+The previous two-output mockup is rejected. Do not implement a separate `Output details` region below or beside a smaller output region. Translator output, compute controls, copy/export actions, warnings, and errors belong in the single `OutputPanel`. The lower-left relation-list panel may add computation tabs for path-indexed row data such as Ambiguities and the Hochschild cochain complex, because those rows drive canvas selection/highlighting like relation rows.
 
 Recommended desktop geometry:
 
@@ -71,7 +71,7 @@ Recommended UI improvements that preserve the current structure:
 - Put optional computation controls inside `OutputPanel`, because they produce output and should not compete with graph-editing controls.
 - Include a compact path-orientation control, preferably a two-option segmented control: `L2R` and `R2L`. It may live near relation display/output controls, but it must not be confused with graph direction or arrow reversal.
 - The user may switch between `L2R` and `R2L` at any time, before or after relations and computation output exist. Switching convention re-renders relation rows, ambiguity rows, selected-item details, and path text in place; it must not clear the graph, relation list, output panel, or current selection.
-- Use tabs or segmented buttons inside the single `OutputPanel` for `QPA`, `Cytoscape JSON`, `Ambiguities`, `Hochschild complex`, `Cohomology`, and `Cup product` once multiple result types exist.
+- Use tabs or segmented buttons inside the single `OutputPanel` for `QPA`, `Cytoscape JSON`, `Cohomology`, and `Cup product` once multiple result types exist. Ambiguities and Hochschild cochain-complex rows may instead appear as tabs in the lower-left relation-list panel when they are selectable canvas-linked rows.
 - Keep relation rows clickable and selectable; selected relation should update the info box and highlight the corresponding path on the canvas.
 - Keep computation rows clickable and selectable; selected ambiguity/cohomology item should update the info box and, when path data exists, highlight the canvas.
 - Replace long status strings near buttons with compact badges: `Unconfirmed`, `Confirmed`, `Stale`, `Computing`, `Error`.
@@ -136,7 +136,7 @@ Optional monomial-only computation controls live in `OutputPanel`, not in a sepa
 Available controls:
 
 - maximum ambiguity index `N`;
-- `maxPathLength` for admissible path enumeration, shown as a numeric input or stepper, default `50`, minimum `20`;
+- `maxPathLength` for admissible path enumeration, shown as a numeric input on the right side of the `Monomial algebra` section title, default `50`, minimum `20`;
 - compute ambiguities;
 - Hochschild-complex, Hochschild cohomology, and cup-product controls may appear as disabled or staged placeholders before their implementation stage, but they must not run placeholder computations.
 
@@ -145,22 +145,22 @@ Before running any monomial-only computation:
 - convert the current Cytoscape graph data and structured relation path data into the backend input;
 - validate that every listed relation is a single composable path of length at least 2;
 - allow an empty relation list;
-- if any relation is a linear combination, has multiple terms, contains a malformed path, or otherwise is not monomial, show a warning in `InfoPanel` and do not run the computation;
+- if any relation is a linear combination, has multiple terms, contains a malformed path, or otherwise is not monomial, show a short warning in the compact summary line, log details in the Info/Log textbox, and do not run the computation;
 - specifically, pressing `Compute ambiguities` must first run this validation guard. If validation reports a non-monomial relation, malformed path, or stale unparsable relation state, the handler must return immediately before calling `computeAmbiguities` or any backend ambiguity helper;
 - after validation passes, pressing `Compute ambiguities` must align both `L2R` and `R2L` relation copies before computing;
-- validate `maxPathLength >= 20`; if not, show a warning in `InfoPanel` and do not run the computation;
+- validate `maxPathLength >= 20`; if not, show a warning in the compact summary line and do not run the computation;
 - leave the previous `OutputPanel` results unchanged unless the user explicitly clears or reruns a valid computation;
 - do not silently skip non-monomial relations and compute from the remaining subset.
 
 Computation output behavior:
 
-- computation buttons write their finite rendered results to `OutputPanel`;
+- computation buttons write summaries and warnings to `OutputPanel`; selectable path-indexed rows may render in lower-left computation tabs when they need relation-list-style selection behavior;
 - the panel is append-or-replace by computation type: rerunning ambiguities replaces the previous ambiguity block, while later Hochschild-complex/cohomology/cup-product blocks may coexist as separate sections;
-- there is no separate detail output panel. Detailed rows are expanded in place inside the single `OutputPanel`, and row selection sends concise details to `InfoPanel`;
+- there is no separate detail output panel. Detailed rows are expanded in place inside the single `OutputPanel`, and row selection writes concise details to the Info/Log textbox when details are needed;
 - each output section has a header, degree range, timestamp or stale marker, compact summary, and expandable detailed rows;
-- each row keeps a stable `id` so selecting it can update `InfoPanel` and trigger canvas highlighting/animation;
+- each selectable computation row keeps a stable `id` so selecting it can log details and trigger canvas highlighting/animation;
 - errors and warnings appear as output items in the same panel instead of alert boxes or console-only messages;
-- ambiguity orientation cross-check warnings appear visibly in both `OutputPanel` and `InfoPanel`;
+- ambiguity orientation cross-check warnings appear visibly in the Info/Log textbox; successful computations, including those with mismatch warnings, do not update the compact summary line;
 - the panel must be clearable without clearing the relation list or canvas.
 
 When ambiguities are available:

@@ -73,21 +73,6 @@
                 <label for="accInput" class="accordionLabel">Code in QPA</label>
                 <div class="accordionPanel">
                     <div id="inputArea">
-                        <div id="controlOpt">
-                            <label>
-                                <input type="checkbox" id="forceID" value="" />
-                                Force vertices to be labelled by numbers
-                            </label>
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    id="forceArrow"
-                                    value=""
-                                />
-                                Force arrows to be labelled by alphabets
-                            </label>
-                        </div>
-
                         <div id="divInputQuiver" class="field-block">
                             <div class="field-heading">
                                 <div>
@@ -99,11 +84,31 @@
                                         relation array.
                                     </div>
                                 </div>
-                                <input
-                                    type="button"
-                                    id="clearQuiverInput"
-                                    value="Clear quiver"
-                                />
+                                <div class="qpa-preset-actions">
+                                    <button
+                                        type="button"
+                                        id="rank4NakayamaPreset"
+                                    >
+                                        rank-4 monomial Nakayama
+                                    </button>
+                                    <button
+                                        type="button"
+                                        id="alosRank3Preset"
+                                    >
+                                        [ALOS] rank-3 monomial example
+                                    </button>
+                                    <button
+                                        type="button"
+                                        id="brauerStarPreset"
+                                    >
+                                        rank-n Brauer star
+                                    </button>
+                                    <input
+                                        type="button"
+                                        id="clearQuiverInput"
+                                        value="Clear quiver"
+                                    />
+                                </div>
                             </div>
                             <!-- ! Do NOT REMOVE !
 Quiver(["v1","v2","v3","v4"], [["v1","v3","a"],["v3","v2","b"],["v2","v1","c"],["v3","v4","d"],["v3","v4","e"]])
@@ -150,7 +155,28 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
 
                         <div class="qpa-actions">
                             <button id="translateBtn" class="button-primary">
-                                Draw
+                                Draw to canvas
+                            </button>
+                            <div id="controlOpt">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        id="forceID"
+                                        value=""
+                                    />
+                                    Force vertices to be labelled by numbers
+                                </label>
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        id="forceArrow"
+                                        value=""
+                                    />
+                                    Force arrows to be labelled by alphabets
+                                </label>
+                            </div>
+                            <button id="toQPABtn" disabled>
+                                Translate to QPA
                             </button>
                         </div>
                     </div>
@@ -301,7 +327,18 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                         </div>
 
                         <div class="control-section monomial-section">
-                            <div class="control-title">Monomial algebra</div>
+                            <div class="control-title monomial-title">
+                                <span>Monomial algebra</span>
+                                <label class="max-path-control">
+                                    <span>maxPathLength</span>
+                                    <input
+                                        id="max-path-length"
+                                        type="number"
+                                        min="20"
+                                        value="50"
+                                    />
+                                </label>
+                            </div>
                             <div class="monomial-grid">
                                 <label class="term-bound-control">
                                     <span>Up to</span>
@@ -319,8 +356,11 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                                 >
                                     Compute ambiguities
                                 </button>
-                                <button type="button" disabled>
-                                    Hocschild complex
+                                <button
+                                    type="button"
+                                    id="computeHochschildComplexBtn"
+                                >
+                                    Hochschild cochain complex
                                 </button>
                                 <button type="button" disabled>
                                     Hochschild cohomology
@@ -328,6 +368,7 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                                 <button type="button" disabled>
                                     Cup product
                                 </button>
+                                <!--
                                 <label class="log-last-control">
                                     <input
                                         id="log-only-last-term"
@@ -335,15 +376,7 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                                     />
                                     <span>Log only last term</span>
                                 </label>
-                                <label class="max-path-control">
-                                    <span>maxPathLength</span>
-                                    <input
-                                        id="max-path-length"
-                                        type="number"
-                                        min="20"
-                                        value="50"
-                                    />
-                                </label>
+                                -->
                             </div>
                         </div>
                     </section>
@@ -369,9 +402,6 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                                 >
                             </div>
                             <div class="output-actions">
-                                <button id="toQPABtn" disabled>
-                                    Translate to QPA
-                                </button>
                                 <input
                                     type="button"
                                     id="clearOutput"
@@ -407,6 +437,15 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                                 >
                                     Ambiguities
                                 </button>
+                                <button
+                                    id="hochschildComplexTabButton"
+                                    type="button"
+                                    data-relation-panel-tab="hochschild-complex"
+                                    aria-pressed="false"
+                                    hidden
+                                >
+                                    Hochschild complex
+                                </button>
                             </div>
                             <div
                                 id="relationsTabPanel"
@@ -440,6 +479,13 @@ Quiver(["v1","v2","v3","v4"], [["v1","v2","a"],["v2","v3","b"],["v3","v4","c"],[
                                 hidden
                             >
                                 <div id="ambiguityOutput"></div>
+                            </div>
+                            <div
+                                id="hochschildComplexTabPanel"
+                                class="relation-tab-panel"
+                                hidden
+                            >
+                                <div id="hochschildComplexOutput"></div>
                             </div>
                         </aside>
 

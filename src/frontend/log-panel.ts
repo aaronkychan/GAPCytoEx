@@ -1,7 +1,17 @@
+function scrollLogToBottom(output: HTMLElement): void {
+  output.scrollTop = output.scrollHeight;
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => {
+      output.scrollTop = output.scrollHeight;
+    });
+  }
+}
+
 export function setOutputHtml(html: string): void {
   const output = document.getElementById("outTxtBox");
   if (output) {
     output.innerHTML = html;
+    scrollLogToBottom(output);
   }
 }
 
@@ -21,6 +31,7 @@ export function appendOutputHtml(html: string): void {
   entry.innerHTML = html;
   output.appendChild(entry);
   appendLogDivider(output);
+  scrollLogToBottom(output);
 }
 
 export function setError(message: string): void {
@@ -45,6 +56,7 @@ export function appendInfoLog(message: string): void {
   line.textContent = message;
   output.appendChild(line);
   appendLogDivider(output);
+  scrollLogToBottom(output);
 }
 
 export function characteristicText(characteristic: number): string {

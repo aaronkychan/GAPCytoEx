@@ -14,7 +14,7 @@ Rules:
 - `reverseOrientation(path)` must be the only helper that switches a path between `L2R` and `R2L` word order.
 - `reverseOrientation` reverses only the stored arrow-word order and toggles the `orientation`; it preserves the mathematical path's `source` and `target` and does not reverse arrow directions.
 - `tidyUpMonomialAlgebra(input)` validates relation composability using the stored `L2R` path, keeps `originalRelations`, and produces `minimisedRelations`.
-- Invalid or stale relation orientation data must block computation and report a warning in `InfoPanel`.
+- Invalid or stale relation orientation data must block computation and report a warning in the compact summary line, with details in the Info/Log textbox when available.
 
 ### 1. Minimise Relation Generators
 
@@ -71,7 +71,7 @@ The backend also implements the equivalent `L2R` **right ambiguity** constructio
 u_n | u_{n-1} | ... | u_0 | u_{-1}
 ```
 
-where `u_{-1}` is the target vertex path on the right in traversal order. This second implementation exists as a development cross-check. During the development phase, pressing `Compute ambiguities` computes both versions, applies `reverseOrientationOfAmbiguity` to compare them, and reports a warning in `InfoPanel` and `OutputPanel` if the two lists differ.
+where `u_{-1}` is the target vertex path on the right in traversal order. This second implementation exists as a development cross-check. During the development phase, pressing `Compute ambiguities` computes both versions, applies `reverseOrientationOfAmbiguity` to compare them, and reports any mismatch warning in the visible Info/Log textbox.
 
 Ambiguities are represented by an `AmbiguitySequence`, a memoized lazy sequence indexed by `n >= -1`. Calling `getAt(n)` computes any missing lower degrees required by the induction and then returns `Gamma[n]`. Calling `getArray(-1, N)` is the bounded helper used by the frontend and tests.
 
@@ -141,7 +141,7 @@ Development cross-check:
     4. map one side through `reverseOrientationOfAmbiguity`;
     5. compare degree-by-degree after aligning display-only differences;
     6. emit an `orientation-mismatch` warning if the two lists are not identical.
-- A mismatch warning must appear in both `InfoPanel` and the `OutputPanel` ambiguity section. It must not be hidden in the console.
+- A mismatch warning must appear in the visible Info/Log textbox. It must not be hidden in the console. Per the accepted summary-log policy, a successful computation with a mismatch warning does not update the compact summary line; only failed computations update that summary line.
 - The mismatch warning should include the lowest degree where the two conventions diverge and enough display text to inspect the differing ambiguity rows.
 - Once the two implementations are stable, the cross-check may be kept behind a development flag, but the spec requires it during the development phase.
 
@@ -157,6 +157,13 @@ Build the Hochschild cochain complex used to compute Hochschild cohomology. Do n
 C^n = Hom_{A^e}(Bzl_{n+1}(A), A) \cong \Bbbk \Gamma_n || \mathcal{B}.
 ```
 
+Terminology and indexing:
+
+- The object is called the Hochschild **cochain** complex because it computes Hochschild cohomology.
+- The implementation enumerates its terms using the natural non-negative chain-complex-style index set `0, 1, 2, ...`.
+- Thus `terms.getAt(n)` returns the cochain term `C^n`, not a shifted chain term.
+- Internally, the paper's coboundary formula `partial^m : k Gamma_{m-1} || B -> k Gamma_m || B` is used with `m = n + 1` to compute the implementation map `d^n : C^n -> C^{n + 1}`.
+
 The complex is a virtually infinite object whose individual cochain degrees are finite-dimensional vector spaces over the selected field.
 
 The `HochschildCochainComplex` object contains:
@@ -164,10 +171,11 @@ The `HochschildCochainComplex` object contains:
 - `terms.getAt(n)`: the cochain term `C^n` in degree `n`;
 - `coboundaries.getAt(n)`: the cochain coboundary `d^n : C^n -> C^{n + 1}`;
 - `getArray(start, endInclusive)` helpers on both sequences for UI display, testing, and finite exports.
+- the admissible basis enumeration and ambiguity computation used to build the complex, so UI pipelines can reuse checked intermediate data instead of recomputing it.
 
 Indexing convention:
 
-- Use cochain-complex convention.
+- Use chain-complex convention.
 - `terms.getAt(n)` is defined only for non-negative integers `n >= 0`.
 - Calling `terms.getAt(n)` with `n < 0` is an error; no Hochschild cochain implementation should need it.
 - `terms.getAt(n)` uses `Gamma[n]` and admissible basis paths.
@@ -198,12 +206,21 @@ interface SparseMatrix {
 
 Use the paper's Hochschild coboundary formulas with the cochain indexing above and the explicit `R2L`/`L2R` path-orientation rules from the ambiguity stage.
 
+When computing a bounded range of terms through `C^N`, check all newly available identities `d^{i + 1} d^i = 0`. The first bounded computation checks from `i = 0`; if a later computation raises the bound, start from the first previously unchecked index. If a composite is nonzero, log a visible warning that `d` is not a differential and report the troublesome index.
+
+If the user computes the Hochschild cochain complex before computing ambiguities, the frontend must first compute the admissible basis and ambiguity data, populate the Ambiguities tab with the usual ambiguity rows, then focus the Hochschild complex tab.
+
+The lower-left relation-list panel may show a Hochschild complex tab after a successful computation. This tab displays the finite requested slice of terms and differentials. Zero terms display only `C^n (0)`. A differential that is zero on every basis element displays only `d^n = 0`. Nonzero images display in the form `p||b ↦ sum`.
+
+Selecting a Hochschild basis row `p||b` highlights the ambiguity path `p` and basis path `b` in two contrasting colors on the canvas and writes a concise color legend to the visible Info/Log textbox.
+
 Field support for v1:
 
-- rational numbers, or
-- prime finite fields `F_p`.
+- rational numbers.
 
-The spec needs one field implementation chosen before coding.
+When this computation is triggered from the UI, append a visible computation log line saying `Computing in rationals.`.
+
+Prime finite fields `F_p` are deferred until the cohomology linear-algebra stage needs field-parametric row reduction.
 
 ### 5. Compute Cohomology
 

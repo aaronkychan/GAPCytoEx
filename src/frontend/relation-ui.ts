@@ -1,5 +1,6 @@
 import type { RelationData } from "../backend/relations";
-import type { Ambiguity } from "../backend/ambiguities";
+import { underlyingPathOfAmbiguity, type Ambiguity } from "../backend/ambiguities";
+import type { CochainBasisElement, CochainSpace, SparseMatrix } from "../backend/chainCpx";
 import type { Path } from "../backend/paths";
 import {
   formatRelationData,
@@ -8,18 +9,30 @@ import {
 } from "../backend/relations";
 import { parseRelationEntries, parseSingleRelation, quiverFromCytoscape } from "../backend/qpa-translator";
 import type { WorkbenchState } from "./workbench-state";
-import { setError } from "./log-panel";
+import { appendInfoLog, setError } from "./log-panel";
 import { cytoThemeColors, relationHighlightColor } from "./cytoscape-style";
 
 function formatPathWord(arrows: string[]): string {
   return arrows.join("·");
 }
 
-function formatAmbiguityPiece(piece: Path): string {
-  if (piece.arrows.length === 0) {
-    return `(${piece.target})`;
+function formatPathForDisplay(path: Path): string {
+  if (path.arrows.length === 0) {
+    return `(${path.target})`;
   }
-  return formatPathWord(piece.arrows);
+  return formatPathWord(path.arrows);
+}
+
+function formatPathForL2RDisplay(path: Path): string {
+  if (path.arrows.length === 0) {
+    return `(${path.target})`;
+  }
+  const arrows = path.orientation === "R2L" ? [...path.arrows].reverse() : path.arrows;
+  return formatPathWord(arrows);
+}
+
+function formatAmbiguityPiece(piece: Path): string {
+  return formatPathForDisplay(piece);
 }
 
 export function formatAmbiguityForDisplay(ambiguity: Ambiguity): string {
@@ -30,10 +43,19 @@ function ambiguityRowId(degree: number, index: number): string {
   return `ambiguity-${degree}-${index}`;
 }
 
+function hochschildBasisRowId(degree: number, index: number): string {
+  return `hochschild-${degree}-${index}`;
+}
+
 function ambiguityByIndex(state: WorkbenchState, degree: number, index: number): Ambiguity | null {
   const groups = state.ambiguityGroupsByOrientation?.[state.activePathOrientation];
   const group = groups?.find((candidate) => candidate.degree === degree);
   return group?.ambiguities[index] ?? null;
+}
+
+function hochschildBasisByIndex(state: WorkbenchState, degree: number, index: number): CochainBasisElement | null {
+  const term = state.hochschildComplex?.terms.find((candidate) => candidate.degree === degree);
+  return term?.basis[index] ?? null;
 }
 
 function resetCanvasEdgeStyles(state: WorkbenchState): void {
@@ -74,8 +96,11 @@ function renderAmbiguityRowContents(row: HTMLElement, ambiguity: Ambiguity): voi
   });
 }
 
-export function setRelationPanelTab(state: WorkbenchState, tab: "relations" | "ambiguities"): void {
+export function setRelationPanelTab(state: WorkbenchState, tab: "relations" | "ambiguities" | "hochschild-complex"): void {
   if (tab === "ambiguities" && !state.ambiguityGroupsByOrientation) {
+    tab = "relations";
+  }
+  if (tab === "hochschild-complex" && !state.hochschildComplex) {
     tab = "relations";
   }
   state.relationPanelTab = tab;
@@ -85,21 +110,34 @@ export function setRelationPanelTab(state: WorkbenchState, tab: "relations" | "a
 
   const relationPanel = document.getElementById("relationsTabPanel");
   const ambiguityPanel = document.getElementById("ambiguitiesTabPanel");
+  const hochschildPanel = document.getElementById("hochschildComplexTabPanel");
   if (relationPanel) {
     relationPanel.hidden = tab !== "relations";
   }
   if (ambiguityPanel) {
     ambiguityPanel.hidden = tab !== "ambiguities";
   }
+  if (hochschildPanel) {
+    hochschildPanel.hidden = tab !== "hochschild-complex";
+  }
 }
 
 function refreshRelationPanelTabs(state: WorkbenchState): void {
   const ambiguityButton = document.getElementById("ambiguitiesTabButton");
+  const hochschildButton = document.getElementById("hochschildComplexTabButton");
   const hasAmbiguities = state.ambiguityGroupsByOrientation !== null;
+  const hasHochschildComplex = state.hochschildComplex !== null;
   if (ambiguityButton) {
     ambiguityButton.hidden = !hasAmbiguities;
   }
-  setRelationPanelTab(state, hasAmbiguities ? state.relationPanelTab : "relations");
+  if (hochschildButton) {
+    hochschildButton.hidden = !hasHochschildComplex;
+  }
+  const hasActiveTab =
+    state.relationPanelTab === "relations" ||
+    (state.relationPanelTab === "ambiguities" && hasAmbiguities) ||
+    (state.relationPanelTab === "hochschild-complex" && hasHochschildComplex);
+  setRelationPanelTab(state, hasActiveTab ? state.relationPanelTab : "relations");
 }
 
 export function refreshAmbiguitiesOutput(state: WorkbenchState): void {
@@ -147,10 +185,118 @@ export function refreshAmbiguitiesOutput(state: WorkbenchState): void {
 }
 
 function clearAmbiguityResults(state: WorkbenchState): void {
+  state.monomialComputationContext = null;
   state.ambiguityGroupsByOrientation = null;
+  state.hochschildComplex = null;
   state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
   state.relationPanelTab = "relations";
   refreshAmbiguitiesOutput(state);
+  refreshHochschildComplexOutput(state);
+}
+
+function formatCochainBasisElement(element: CochainBasisElement): string {
+  return `${formatPathForL2RDisplay(underlyingPathOfAmbiguity(element.ambiguity))}||${formatPathForL2RDisplay(element.basisPath)}`;
+}
+
+function formatCoefficient(value: number, isFirst: boolean): string {
+  if (value === 1) {
+    return isFirst ? "" : "+ ";
+  }
+  if (value === -1) {
+    return "- ";
+  }
+  if (value < 0) {
+    return `${value} `;
+  }
+  return isFirst ? `${value} ` : `+ ${value} `;
+}
+
+function formatImageForColumn(matrix: SparseMatrix, target: CochainSpace, col: number): string {
+  const entries = matrix.entries.filter((entry) => entry.col === col);
+  if (entries.length === 0) {
+    return "0";
+  }
+  return entries
+    .map((entry, index) => `${formatCoefficient(entry.value, index === 0)}${formatCochainBasisElement(target.basis[entry.row])}`)
+    .join(" ");
+}
+
+function appendHochschildTerm(output: HTMLElement, state: WorkbenchState, term: CochainSpace, rowIndex: { value: number }): void {
+  const heading = document.createElement("div");
+  heading.className = "ambiguity-degree";
+  heading.textContent = `C^${term.degree} (${term.dimension})`;
+  output.appendChild(heading);
+
+  if (term.basis.length === 0) {
+    return;
+  }
+
+  term.basis.forEach((basisElement, basisIndex) => {
+    const row = document.createElement("div");
+    row.className = `hochschildRow ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
+    row.dataset.hochschildBasisId = hochschildBasisRowId(term.degree, basisIndex);
+    row.textContent = formatCochainBasisElement(basisElement);
+    row.addEventListener("click", () => selectHochschildBasis(state, term.degree, basisIndex));
+    output.appendChild(row);
+    rowIndex.value += 1;
+  });
+}
+
+function appendHochschildDifferential(
+  output: HTMLElement,
+  source: CochainSpace,
+  target: CochainSpace,
+  matrix: SparseMatrix,
+  rowIndex: { value: number }
+): void {
+  const heading = document.createElement("div");
+  heading.className = "ambiguity-degree hochschild-differential-heading";
+  const hasNonzeroImage = matrix.entries.length > 0;
+  heading.textContent = hasNonzeroImage ? `d^${source.degree}` : `d^${source.degree} = 0`;
+  output.appendChild(heading);
+
+  if (source.basis.length === 0 || !hasNonzeroImage) {
+    return;
+  }
+
+  source.basis.forEach((basisElement, col) => {
+    if (!matrix.entries.some((entry) => entry.col === col)) {
+      return;
+    }
+    const row = document.createElement("div");
+    row.className = `hochschildRow differential-row ${rowIndex.value % 2 === 0 ? "row-even" : "row-odd"}`;
+    row.textContent = `${formatCochainBasisElement(basisElement)} ↦ ${formatImageForColumn(matrix, target, col)}`;
+    output.appendChild(row);
+    rowIndex.value += 1;
+  });
+}
+
+export function refreshHochschildComplexOutput(state: WorkbenchState): void {
+  refreshRelationPanelTabs(state);
+  const output = document.getElementById("hochschildComplexOutput");
+  if (!output) {
+    return;
+  }
+  output.innerHTML = "";
+  state.selectedHochschildBasisId = null;
+  const complex = state.hochschildComplex;
+  if (!complex) {
+    return;
+  }
+
+  const rowIndex = { value: 0 };
+  for (let index = 0; index < complex.terms.length; index += 1) {
+    if (index > 0) {
+      output.appendChild(document.createElement("hr")).className = "ambiguity-divider";
+    }
+    appendHochschildTerm(output, state, complex.terms[index], rowIndex);
+    const nextTerm = complex.terms[index + 1];
+    const differential = complex.coboundaries[index];
+    if (nextTerm && differential) {
+      appendHochschildDifferential(output, complex.terms[index], nextTerm, differential, rowIndex);
+    }
+  }
 }
 
 export function selectAmbiguity(state: WorkbenchState, degree: number, index: number): void {
@@ -160,14 +306,56 @@ export function selectAmbiguity(state: WorkbenchState, degree: number, index: nu
   }
   state.selectedRelationIndex = -1;
   state.selectedAmbiguityId = ambiguityRowId(degree, index);
+  state.selectedHochschildBasisId = null;
   clearRelationAnimation(state);
   resetCanvasEdgeStyles(state);
   document.querySelectorAll("#relOutput .relationRow").forEach((row) => row.classList.remove("selectedRelationRow"));
   document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#hochschildComplexOutput .hochschildRow").forEach((row) => row.classList.remove("selectedRelationRow"));
   document.querySelectorAll("#ambiguityOutput .ambiguity-piece").forEach((piece) => piece.classList.remove("is-pair-highlighted", "is-flow-current"));
   const row = document.querySelector(`#ambiguityOutput [data-ambiguity-id="${state.selectedAmbiguityId}"]`);
   row?.classList.add("selectedRelationRow");
   animateAmbiguity(state, ambiguity, row);
+}
+
+export function selectHochschildBasis(state: WorkbenchState, degree: number, index: number): void {
+  const basisElement = hochschildBasisByIndex(state, degree, index);
+  if (!basisElement) {
+    return;
+  }
+  state.selectedRelationIndex = -1;
+  state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = hochschildBasisRowId(degree, index);
+  clearRelationAnimation(state);
+  resetCanvasEdgeStyles(state);
+  document.querySelectorAll("#relOutput .relationRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#hochschildComplexOutput .hochschildRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  const row = document.querySelector(`#hochschildComplexOutput [data-hochschild-basis-id="${state.selectedHochschildBasisId}"]`);
+  row?.classList.add("selectedRelationRow");
+
+  const pColor = relationHighlightColor(0);
+  const bColor = relationHighlightColor(1);
+  const pPath = underlyingPathOfAmbiguity(basisElement.ambiguity);
+  pPath.arrows.forEach((arrow) => {
+    state.cy?.getElementById(arrow).style({
+      width: 4,
+      "line-color": pColor,
+      "target-arrow-color": pColor,
+      "target-arrow-shape": "triangle"
+    });
+  });
+  basisElement.basisPath.arrows.forEach((arrow) => {
+    state.cy?.getElementById(arrow).style({
+      width: 5,
+      "line-color": bColor,
+      "target-arrow-color": bColor,
+      "target-arrow-shape": "triangle"
+    });
+  });
+  appendInfoLog(
+    `Selecting basis ${formatCochainBasisElement(basisElement)} of the ${degree}-th term of Hochschild complex. (p displayed in orange/amber color, b displayed in blue/green color)`
+  );
 }
 
 export function validateRelationArrowReferences(relations: RelationData[], cyInstance: any): boolean {
@@ -227,6 +415,7 @@ export function refreshRelationsOutput(state: WorkbenchState): void {
   output.classList.remove("add-relation-mode");
   output.contentEditable = "false";
   state.selectedRelationIndex = -1;
+  state.selectedHochschildBasisId = null;
 
   state.relations.forEach((relation, index) => {
     const row = document.createElement("div");
@@ -265,6 +454,7 @@ export function setPathOrientation(state: WorkbenchState, orientation: "L2R" | "
 
   refreshRelationsOutput(state);
   refreshAmbiguitiesOutput(state);
+  refreshHochschildComplexOutput(state);
   if (state.cy && relationToSelect >= 0 && relationToSelect < state.relations.length) {
     selectRelation(state, relationToSelect);
   }
@@ -361,6 +551,7 @@ function animateAmbiguity(state: WorkbenchState, ambiguity: Ambiguity, row: Elem
 export function selectRelation(state: WorkbenchState, index: number): void {
   state.selectedRelationIndex = index;
   state.selectedAmbiguityId = null;
+  state.selectedHochschildBasisId = null;
   clearRelationAnimation(state);
   if (!state.cy) {
     return;
@@ -371,6 +562,7 @@ export function selectRelation(state: WorkbenchState, index: number): void {
 
   rows.forEach((row) => row.classList.remove("selectedRelationRow"));
   document.querySelectorAll("#ambiguityOutput .ambiguityRow").forEach((row) => row.classList.remove("selectedRelationRow"));
+  document.querySelectorAll("#hochschildComplexOutput .hochschildRow").forEach((row) => row.classList.remove("selectedRelationRow"));
   document.querySelectorAll("#ambiguityOutput .ambiguity-piece").forEach((piece) => piece.classList.remove("is-pair-highlighted", "is-flow-current"));
   if (index < 0 || index >= rows.length || index >= state.relations.length) {
     return;
